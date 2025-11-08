@@ -5,8 +5,8 @@ The provider has been successfully renamed to **`msgraph_entra`** using undersco
 ## ✅ Final Configuration
 
 **Provider Name:** `msgraph_entra`
-**Module:** `github.com/yourusername/terraform-provider-msgraph-entra`
-**Registry:** `registry.terraform.io/yourusername/msgraph-entra`
+**Module:** `github.com/ethorneloe/terraform-provider-msgraph-entra`
+**Registry:** `registry.terraform.io/ethorneloe/msgraph-entra`
 **Binary:** `terraform-provider-msgraph-entra.exe` (169MB)
 
 ## 📝 Usage Examples
@@ -17,7 +17,7 @@ The provider has been successfully renamed to **`msgraph_entra`** using undersco
 terraform {
   required_providers {
     msgraph_entra = {
-      source  = "yourusername/msgraph-entra"
+      source  = "ethorneloe/msgraph-entra"
       version = "~> 1.0"
     }
   }

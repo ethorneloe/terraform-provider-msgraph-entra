@@ -14,12 +14,12 @@ import (
 	"github.com/microsoftgraph/msgraph-sdk-go/rolemanagement"
 )
 
-// GraphClient wraps the Microsoft Graph SDK client
+// GraphClient wraps the Microsoft Graph SDK client.
 type GraphClient struct {
 	client *msgraphsdk.GraphServiceClient
 }
 
-// NewGraphClient creates a new Microsoft Graph API client
+// NewGraphClient creates a new Microsoft Graph API client.
 func NewGraphClient(ctx context.Context, tenantID, clientID, clientSecret, oidcToken string, useCLI bool) (*GraphClient, error) {
 	var credential azcore.TokenCredential
 	var err error
@@ -77,9 +77,9 @@ func NewGraphClient(ctx context.Context, tenantID, clientID, clientSecret, oidcT
 	}, nil
 }
 
-// GetDirectoryRole retrieves a directory role by display name or template ID
+// GetDirectoryRole retrieves a directory role by display name or template ID.
 func (c *GraphClient) GetDirectoryRole(ctx context.Context, roleIdentifier string) (models.DirectoryRoleable, error) {
-	// Try to get by template ID first
+	// Try to get by template ID first.
 	roles, err := c.client.DirectoryRoles().Get(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list directory roles: %w", err)
@@ -100,7 +100,7 @@ func (c *GraphClient) GetDirectoryRole(ctx context.Context, roleIdentifier strin
 	return nil, fmt.Errorf("directory role not found: %s", roleIdentifier)
 }
 
-// GetDirectoryRoleDefinition retrieves a role definition by ID
+// GetDirectoryRoleDefinition retrieves a role definition by ID.
 func (c *GraphClient) GetDirectoryRoleDefinition(ctx context.Context, roleDefinitionID string) (models.UnifiedRoleDefinitionable, error) {
 	role, err := c.client.RoleManagement().Directory().RoleDefinitions().ByUnifiedRoleDefinitionId(roleDefinitionID).Get(ctx, nil)
 	if err != nil {
@@ -109,7 +109,7 @@ func (c *GraphClient) GetDirectoryRoleDefinition(ctx context.Context, roleDefini
 	return role, nil
 }
 
-// CreateRoleEligibilityScheduleRequest creates an eligible role assignment
+// CreateRoleEligibilityScheduleRequest creates an eligible role assignment.
 func (c *GraphClient) CreateRoleEligibilityScheduleRequest(ctx context.Context, request models.UnifiedRoleEligibilityScheduleRequestable) (models.UnifiedRoleEligibilityScheduleRequestable, error) {
 	result, err := c.client.RoleManagement().Directory().RoleEligibilityScheduleRequests().Post(ctx, request, nil)
 	if err != nil {
@@ -118,7 +118,7 @@ func (c *GraphClient) CreateRoleEligibilityScheduleRequest(ctx context.Context, 
 	return result, nil
 }
 
-// GetRoleEligibilityScheduleRequest retrieves a role eligibility schedule request
+// GetRoleEligibilityScheduleRequest retrieves a role eligibility schedule request.
 func (c *GraphClient) GetRoleEligibilityScheduleRequest(ctx context.Context, requestID string) (models.UnifiedRoleEligibilityScheduleRequestable, error) {
 	result, err := c.client.RoleManagement().Directory().RoleEligibilityScheduleRequests().ByUnifiedRoleEligibilityScheduleRequestId(requestID).Get(ctx, nil)
 	if err != nil {
@@ -127,9 +127,9 @@ func (c *GraphClient) GetRoleEligibilityScheduleRequest(ctx context.Context, req
 	return result, nil
 }
 
-// DeleteRoleEligibilityScheduleRequest deletes (revokes) an eligible role assignment
+// DeleteRoleEligibilityScheduleRequest deletes (revokes) an eligible role assignment.
 func (c *GraphClient) DeleteRoleEligibilityScheduleRequest(ctx context.Context, roleEligibilityScheduleID string, principalID, roleDefinitionID, directoryScopeID string) error {
-	// To delete, we create a new request with action = "adminRemove"
+	// To delete, we create a new request with action = "adminRemove".
 	request := models.NewUnifiedRoleEligibilityScheduleRequest()
 	action := models.ADMINREMOVE_UNIFIEDROLESCHEDULEREQUESTACTIONS
 	request.SetAction(&action)
@@ -145,7 +145,7 @@ func (c *GraphClient) DeleteRoleEligibilityScheduleRequest(ctx context.Context, 
 	return nil
 }
 
-// ListRoleEligibilitySchedules lists all eligible role assignments
+// ListRoleEligibilitySchedules lists all eligible role assignments.
 func (c *GraphClient) ListRoleEligibilitySchedules(ctx context.Context) ([]models.UnifiedRoleEligibilityScheduleable, error) {
 	result, err := c.client.RoleManagement().Directory().RoleEligibilitySchedules().Get(ctx, nil)
 	if err != nil {
@@ -154,7 +154,7 @@ func (c *GraphClient) ListRoleEligibilitySchedules(ctx context.Context) ([]model
 	return result.GetValue(), nil
 }
 
-// GetRoleEligibilitySchedule retrieves a specific eligible role assignment by ID
+// GetRoleEligibilitySchedule retrieves a specific eligible role assignment by ID.
 func (c *GraphClient) GetRoleEligibilitySchedule(ctx context.Context, scheduleID string) (models.UnifiedRoleEligibilityScheduleable, error) {
 	result, err := c.client.RoleManagement().Directory().RoleEligibilitySchedules().ByUnifiedRoleEligibilityScheduleId(scheduleID).Get(ctx, nil)
 	if err != nil {
@@ -163,7 +163,7 @@ func (c *GraphClient) GetRoleEligibilitySchedule(ctx context.Context, scheduleID
 	return result, nil
 }
 
-// Helper function to get RoleManagement Directory RequestBuilder
+// GetRoleManagementDirectory is a helper function to get RoleManagement Directory RequestBuilder.
 func (c *GraphClient) GetRoleManagementDirectory() *rolemanagement.DirectoryRequestBuilder {
 	return c.client.RoleManagement().Directory()
 }

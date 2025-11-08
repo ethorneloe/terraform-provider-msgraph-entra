@@ -31,7 +31,7 @@ Create `main.tf`:
 terraform {
   required_providers {
     msgraph_entra = {
-      source = "yourusername/msgraph_entra"
+      source = "ethorneloe/msgraph_entra"
     }
   }
 }

@@ -30,8 +30,8 @@ This provider fills those gaps by providing direct support for Entra ID director
 ## Building The Provider
 
 ```shell
-git clone <repository-url>
-cd terraform-provider-msgraph_entra
+git clone https://github.com/ethorneloe/terraform-provider-msgraph-entra
+cd terraform-provider-msgraph-entra
 go build -o terraform-provider-msgraph_entra.exe
 ```
 
