@@ -214,6 +214,45 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 		// Create a pseudo request ID (we don't have the original request)
 		data.ID = data.ScheduleID
 
+		// Populate schedule info from the existing schedule
+		if existingSchedule.GetScheduleInfo() != nil {
+			scheduleInfo := existingSchedule.GetScheduleInfo()
+			if data.ScheduleInfo == nil {
+				data.ScheduleInfo = &ScheduleInfoModel{}
+			}
+
+			if scheduleInfo.GetStartDateTime() != nil {
+				data.ScheduleInfo.StartDateTime = types.StringValue(scheduleInfo.GetStartDateTime().Format(time.RFC3339))
+			}
+
+			if scheduleInfo.GetExpiration() != nil {
+				expiration := scheduleInfo.GetExpiration()
+				if data.ScheduleInfo.Expiration == nil {
+					data.ScheduleInfo.Expiration = &ExpirationModel{}
+				}
+
+				if expiration.GetTypeEscaped() != nil {
+					switch *expiration.GetTypeEscaped() {
+					case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
+					case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
+					case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
+					}
+				}
+
+				if expiration.GetEndDateTime() != nil {
+					data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
+				}
+
+				if expiration.GetDuration() != nil {
+					data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
+				}
+			}
+		}
+
+		tflog.Info(ctx, "Successfully imported existing assignment into state")
 		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
@@ -277,7 +316,7 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 				expiration.SetTypeEscaped(&expType)
 			}
 
-			if !data.ScheduleInfo.Expiration.EndDateTime.IsNull() {
+			if !data.ScheduleInfo.Expiration.EndDateTime.IsNull() && data.ScheduleInfo.Expiration.EndDateTime.ValueString() != "" {
 				endDateTime, err := time.Parse(time.RFC3339, data.ScheduleInfo.Expiration.EndDateTime.ValueString())
 				if err != nil {
 					resp.Diagnostics.AddError(
@@ -352,63 +391,61 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 	}
 
 	if schedule == nil {
-		resp.Diagnostics.AddWarning(
-			"Schedule Not Yet Available",
-			"The role eligibility schedule request was created but the schedule is not yet available. "+
-				"This is normal for PIM operations. The schedule will appear on the next refresh.",
+		resp.Diagnostics.AddError(
+			"Schedule Creation Timeout",
+			fmt.Sprintf("The role eligibility schedule request was created (ID: %s) but the schedule did not appear after %d seconds. "+
+				"This may indicate Azure is experiencing delays. Please wait a moment and try again.",
+				*result.GetId(), int(retryDelay.Seconds()*float64(maxRetries))),
 		)
-		// Set what we have from the request
-		if result.GetTargetScheduleId() != nil {
-			data.ScheduleID = types.StringPointerValue(result.GetTargetScheduleId())
-		}
-	} else {
-		// Successfully found the schedule - populate all fields from the actual schedule
-		if schedule.GetId() != nil {
-			data.ScheduleID = types.StringPointerValue(schedule.GetId())
-		}
-
-		// Update schedule info from the actual schedule
-		if schedule.GetScheduleInfo() != nil {
-			scheduleInfo := schedule.GetScheduleInfo()
-			if data.ScheduleInfo == nil {
-				data.ScheduleInfo = &ScheduleInfoModel{}
-			}
-
-			if scheduleInfo.GetStartDateTime() != nil {
-				data.ScheduleInfo.StartDateTime = types.StringValue(scheduleInfo.GetStartDateTime().Format(time.RFC3339))
-			}
-
-			if scheduleInfo.GetExpiration() != nil {
-				expiration := scheduleInfo.GetExpiration()
-				if data.ScheduleInfo.Expiration == nil {
-					data.ScheduleInfo.Expiration = &ExpirationModel{}
-				}
-
-				if expiration.GetTypeEscaped() != nil {
-					switch *expiration.GetTypeEscaped() {
-					case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
-						data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
-					case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
-						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
-					case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
-						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
-					}
-				}
-
-				if expiration.GetEndDateTime() != nil {
-					data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
-				}
-
-				if expiration.GetDuration() != nil {
-					data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
-				}
-			}
-		}
-
-		tflog.Info(ctx, "Schedule created and available", map[string]any{
-			"schedule_id": data.ScheduleID.ValueString(),
-		})
+		return
 	}
+
+	// Successfully found the schedule - populate all fields from the actual schedule
+	if schedule.GetId() != nil {
+		data.ScheduleID = types.StringPointerValue(schedule.GetId())
+	}
+
+	// Update schedule info from the actual schedule
+	if schedule.GetScheduleInfo() != nil {
+		scheduleInfo := schedule.GetScheduleInfo()
+		if data.ScheduleInfo == nil {
+			data.ScheduleInfo = &ScheduleInfoModel{}
+		}
+
+		if scheduleInfo.GetStartDateTime() != nil {
+			data.ScheduleInfo.StartDateTime = types.StringValue(scheduleInfo.GetStartDateTime().Format(time.RFC3339))
+		}
+
+		if scheduleInfo.GetExpiration() != nil {
+			expiration := scheduleInfo.GetExpiration()
+			if data.ScheduleInfo.Expiration == nil {
+				data.ScheduleInfo.Expiration = &ExpirationModel{}
+			}
+
+			if expiration.GetTypeEscaped() != nil {
+				switch *expiration.GetTypeEscaped() {
+				case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
+					data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
+				case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
+					data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
+				case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
+					data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
+				}
+			}
+
+			if expiration.GetEndDateTime() != nil {
+				data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
+			}
+
+			if expiration.GetDuration() != nil {
+				data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
+			}
+		}
+	}
+
+	tflog.Info(ctx, "Schedule created and available", map[string]any{
+		"schedule_id": data.ScheduleID.ValueString(),
+	})
 
 	tflog.Trace(ctx, "Created directory role eligible assignment", map[string]any{
 		"id":          data.ID.ValueString(),
@@ -601,7 +638,7 @@ func (r *DirectoryRoleEligibleAssignmentResource) Update(ctx context.Context, re
 				expiration.SetTypeEscaped(&expType)
 			}
 
-			if !plan.ScheduleInfo.Expiration.EndDateTime.IsNull() {
+			if !plan.ScheduleInfo.Expiration.EndDateTime.IsNull() && plan.ScheduleInfo.Expiration.EndDateTime.ValueString() != "" {
 				endDateTime, err := time.Parse(time.RFC3339, plan.ScheduleInfo.Expiration.EndDateTime.ValueString())
 				if err != nil {
 					resp.Diagnostics.AddError(
@@ -697,7 +734,57 @@ func (r *DirectoryRoleEligibleAssignmentResource) Delete(ctx context.Context, re
 		return
 	}
 
-	tflog.Trace(ctx, "Deleted directory role eligible assignment")
+	// Wait for the schedule to be deleted (adminRemove is processed asynchronously)
+	// Poll for up to 30 seconds to verify the schedule is gone
+	tflog.Debug(ctx, "Submitted delete request, waiting for schedule to be removed")
+	maxRetries := 15
+	retryDelay := 2 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			tflog.Debug(ctx, "Checking if schedule is deleted", map[string]any{
+				"attempt": i + 1,
+				"max":     maxRetries,
+			})
+			time.Sleep(retryDelay)
+		}
+
+		// Try to find the schedule - if it's gone, we're done
+		schedule, err := r.client.FindRoleEligibilitySchedule(
+			ctx,
+			data.PrincipalID.ValueString(),
+			data.RoleDefinitionID.ValueString(),
+			data.DirectoryScopeID.ValueString(),
+		)
+
+		if err != nil {
+			// Error querying - might be transient, continue retrying
+			tflog.Debug(ctx, "Error checking schedule status", map[string]any{
+				"error": err.Error(),
+			})
+			continue
+		}
+
+		if schedule == nil {
+			// Schedule is gone - success!
+			tflog.Info(ctx, "Schedule successfully deleted and verified")
+			return
+		}
+
+		tflog.Debug(ctx, "Schedule still exists, continuing to wait")
+	}
+
+	// Schedule still exists after timeout - warn but don't fail
+	// The delete was submitted successfully, it just might take longer to process
+	tflog.Warn(ctx, "Delete request submitted but schedule still exists after 30 seconds", map[string]any{
+		"schedule_id": data.ScheduleID.ValueString(),
+	})
+	resp.Diagnostics.AddWarning(
+		"Delete Processing",
+		fmt.Sprintf("The delete request was submitted successfully, but the schedule (ID: %s) is still present after 30 seconds. "+
+			"Azure may still be processing the deletion. The schedule should be removed shortly.",
+			data.ScheduleID.ValueString()),
+	)
 }
 
 func (r *DirectoryRoleEligibleAssignmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

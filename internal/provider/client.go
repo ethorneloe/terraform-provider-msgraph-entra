@@ -212,18 +212,31 @@ func (c *GraphClient) GetUserByUserPrincipalName(ctx context.Context, upn string
 // FindRoleEligibilitySchedule finds an existing eligible role assignment schedule by principal, role, and scope.
 // Returns nil if no matching schedule is found.
 func (c *GraphClient) FindRoleEligibilitySchedule(ctx context.Context, principalID, roleDefinitionID, directoryScopeID string) (models.UnifiedRoleEligibilityScheduleable, error) {
-	schedules, err := c.ListRoleEligibilitySchedules(ctx)
+	// Use OData filter to query only the specific schedule we're looking for
+	// This is more efficient than listing all schedules and filtering in memory
+	filterQuery := fmt.Sprintf(
+		"principalId eq '%s' and roleDefinitionId eq '%s' and directoryScopeId eq '%s'",
+		principalID,
+		roleDefinitionID,
+		directoryScopeID,
+	)
+
+	requestConfig := &rolemanagement.DirectoryRoleEligibilitySchedulesRequestBuilderGetRequestConfiguration{
+		QueryParameters: &rolemanagement.DirectoryRoleEligibilitySchedulesRequestBuilderGetQueryParameters{
+			Filter: &filterQuery,
+		},
+	}
+
+	result, err := c.client.RoleManagement().Directory().RoleEligibilitySchedules().Get(ctx, requestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list role eligibility schedules: %w", err)
+		return nil, fmt.Errorf("failed to find role eligibility schedule: %w", err)
 	}
 
-	for _, schedule := range schedules {
-		if schedule.GetPrincipalId() != nil && *schedule.GetPrincipalId() == principalID &&
-			schedule.GetRoleDefinitionId() != nil && *schedule.GetRoleDefinitionId() == roleDefinitionID &&
-			schedule.GetDirectoryScopeId() != nil && *schedule.GetDirectoryScopeId() == directoryScopeID {
-			return schedule, nil
-		}
+	schedules := result.GetValue()
+	if len(schedules) == 0 {
+		return nil, nil // Not found, but not an error
 	}
 
-	return nil, nil // Not found, but not an error
+	// Return the first matching schedule (should only be one)
+	return schedules[0], nil
 }
