@@ -112,9 +112,12 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 				MarkdownDescription: "The schedule of the role eligibility.",
 				Attributes: map[string]schema.Attribute{
 					"start_date_time": schema.StringAttribute{
-						MarkdownDescription: "When the eligibility starts. Must be in RFC3339 format (e.g., '2025-01-08T00:00:00Z'). Defaults to now.",
+						MarkdownDescription: "When the eligibility starts. Must be in RFC3339 format (e.g., '2025-01-08T00:00:00Z'). Defaults to now. Note: Azure may adjust this value slightly.",
 						Optional:            true,
 						Computed:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
 					},
 				},
 				Blocks: map[string]schema.Block{
@@ -127,8 +130,12 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 								Computed:            true,
 							},
 							"end_date_time": schema.StringAttribute{
-								MarkdownDescription: "The end date/time when type is 'afterDateTime'. Must be in RFC3339 format.",
+								MarkdownDescription: "The end date/time when type is 'afterDateTime'. Must be in RFC3339 format. Note: Azure may adjust this value slightly.",
 								Optional:            true,
+								Computed:            true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
 							},
 							"duration": schema.StringAttribute{
 								MarkdownDescription: "The duration when type is 'afterDuration'. Use ISO 8601 duration format (e.g., 'PT8H' for 8 hours, 'P365D' for 365 days).",
