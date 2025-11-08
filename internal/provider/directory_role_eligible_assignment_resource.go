@@ -364,10 +364,10 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 		return
 	}
 
-	// Set the request ID
-	if result.GetId() != nil {
-		data.ID = types.StringPointerValue(result.GetId())
-	}
+	// The request ID is transient - we'll set the actual resource ID after we get the schedule
+	tflog.Debug(ctx, "Created schedule request", map[string]any{
+		"request_id": *result.GetId(),
+	})
 
 	// Wait for the schedule to be created (the request is processed asynchronously)
 	// Retry for up to 30 seconds
@@ -401,8 +401,11 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 	}
 
 	// Successfully found the schedule - populate all fields from the actual schedule
+	// Use the schedule ID as the resource ID (not the request ID)
 	if schedule.GetId() != nil {
-		data.ScheduleID = types.StringPointerValue(schedule.GetId())
+		scheduleID := types.StringPointerValue(schedule.GetId())
+		data.ID = scheduleID
+		data.ScheduleID = scheduleID
 	}
 
 	// Update schedule info from the actual schedule
@@ -469,24 +472,27 @@ func (r *DirectoryRoleEligibleAssignmentResource) Read(ctx context.Context, req 
 	var schedule models.UnifiedRoleEligibilityScheduleable
 	var err error
 
-	if !data.ScheduleID.IsNull() && data.ScheduleID.ValueString() != "" {
-		// Try to get by schedule ID first (most efficient)
-		schedule, err = r.client.GetRoleEligibilitySchedule(ctx, data.ScheduleID.ValueString())
+	// The resource ID is the schedule ID, try to look it up directly first
+	if !data.ID.IsNull() && data.ID.ValueString() != "" {
+		// Try to get by ID (schedule ID) first (most efficient)
+		schedule, err = r.client.GetRoleEligibilitySchedule(ctx, data.ID.ValueString())
 		if err != nil {
-			// Schedule ID might be stale, fall back to searching by principal+role+scope
-			tflog.Warn(ctx, "Failed to get schedule by ID, searching by principal+role+scope", map[string]any{
-				"schedule_id": data.ScheduleID.ValueString(),
-				"error":       err.Error(),
-			})
-			schedule, err = r.client.FindRoleEligibilitySchedule(
-				ctx,
-				data.PrincipalID.ValueString(),
-				data.RoleDefinitionID.ValueString(),
-				data.DirectoryScopeID.ValueString(),
-			)
+			// ID lookup failed - if we have principal/role/scope info, fall back to searching
+			if !data.PrincipalID.IsNull() && !data.RoleDefinitionID.IsNull() && !data.DirectoryScopeID.IsNull() {
+				tflog.Warn(ctx, "Failed to get schedule by ID, searching by principal+role+scope", map[string]any{
+					"id":    data.ID.ValueString(),
+					"error": err.Error(),
+				})
+				schedule, err = r.client.FindRoleEligibilitySchedule(
+					ctx,
+					data.PrincipalID.ValueString(),
+					data.RoleDefinitionID.ValueString(),
+					data.DirectoryScopeID.ValueString(),
+				)
+			}
 		}
-	} else {
-		// No schedule ID, search by principal+role+scope
+	} else if !data.PrincipalID.IsNull() && !data.RoleDefinitionID.IsNull() && !data.DirectoryScopeID.IsNull() {
+		// No ID, search by principal+role+scope
 		schedule, err = r.client.FindRoleEligibilitySchedule(
 			ctx,
 			data.PrincipalID.ValueString(),
@@ -512,7 +518,20 @@ func (r *DirectoryRoleEligibleAssignmentResource) Read(ctx context.Context, req 
 
 	// Update the state with the current schedule information
 	if schedule.GetId() != nil {
-		data.ScheduleID = types.StringPointerValue(schedule.GetId())
+		scheduleID := types.StringPointerValue(schedule.GetId())
+		data.ID = scheduleID
+		data.ScheduleID = scheduleID
+	}
+
+	// Populate principal, role, and scope from the schedule (needed for import and drift detection)
+	if schedule.GetPrincipalId() != nil {
+		data.PrincipalID = types.StringPointerValue(schedule.GetPrincipalId())
+	}
+	if schedule.GetRoleDefinitionId() != nil {
+		data.RoleDefinitionID = types.StringPointerValue(schedule.GetRoleDefinitionId())
+	}
+	if schedule.GetDirectoryScopeId() != nil {
+		data.DirectoryScopeID = types.StringPointerValue(schedule.GetDirectoryScopeId())
 	}
 
 	// Update schedule info from the actual schedule
