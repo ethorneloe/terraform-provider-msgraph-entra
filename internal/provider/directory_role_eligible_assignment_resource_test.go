@@ -166,6 +166,14 @@ func TestAccDirectoryRoleEligibleAssignmentResource_IdempotentCreate(t *testing.
 
 func testAccDirectoryRoleEligibleAssignmentResourceConfig_basic(principalID, startTime, endTime string) string {
 	return fmt.Sprintf(`
+terraform {
+  required_providers {
+    msgraph-entra = {
+      source = "ethorneloe/msgraph-entra"
+    }
+  }
+}
+
 provider "msgraph-entra" {
   # Authentication is configured via environment variables:
   # - ENTRA_TENANT_ID or ARM_TENANT_ID
@@ -198,6 +206,14 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
 
 func testAccDirectoryRoleEligibleAssignmentResourceConfig_updated(principalID, startTime, endTime string) string {
 	return fmt.Sprintf(`
+terraform {
+  required_providers {
+    msgraph-entra = {
+      source = "ethorneloe/msgraph-entra"
+    }
+  }
+}
+
 provider "msgraph-entra" {
   # Authentication is configured via environment variables:
   # - ENTRA_TENANT_ID or ARM_TENANT_ID
@@ -230,6 +246,14 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
 
 func testAccDirectoryRoleEligibleAssignmentResourceConfig_duration(principalID, startTime, duration string) string {
 	return fmt.Sprintf(`
+terraform {
+  required_providers {
+    msgraph-entra = {
+      source = "ethorneloe/msgraph-entra"
+    }
+  }
+}
+
 provider "msgraph-entra" {
   # Authentication is configured via environment variables:
   # - ENTRA_TENANT_ID or ARM_TENANT_ID

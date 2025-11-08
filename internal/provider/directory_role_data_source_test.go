@@ -40,6 +40,14 @@ func TestAccDirectoryRoleDataSource(t *testing.T) {
 
 func testAccDirectoryRoleDataSourceConfig(displayName string) string {
 	return `
+terraform {
+  required_providers {
+    msgraph-entra = {
+      source = "ethorneloe/msgraph-entra"
+    }
+  }
+}
+
 provider "msgraph-entra" {
   # Authentication is configured via environment variables:
   # - ENTRA_TENANT_ID or ARM_TENANT_ID
