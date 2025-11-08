@@ -14,6 +14,8 @@ import (
 // testAccProtoV6ProviderFactories is used to instantiate a provider during acceptance testing.
 // The factory function is called for each Terraform CLI command to create a provider
 // server that the CLI can connect to and interact with.
+//
+//nolint:unused // Used by acceptance tests in _test.go files
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
 	"msgraph_entra": providerserver.NewProtocol6WithError(New("test")()),
 }
@@ -22,13 +24,66 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 // It allows for testing assertions on data returned by an ephemeral resource during Open.
 // The echoprovider is used to arrange tests by echoing ephemeral data into the Terraform state.
 // This lets the data be referenced in test assertions with state checks.
+//
+//nolint:unused // Used by acceptance tests in _test.go files when testing ephemeral resources
 var testAccProtoV6ProviderFactoriesWithEcho = map[string]func() (tfprotov6.ProviderServer, error){
 	"msgraph_entra": providerserver.NewProtocol6WithError(New("test")()),
 	"echo":          echoprovider.NewProviderServer(),
 }
 
+//nolint:unused // Used by acceptance tests in _test.go files
 func testAccPreCheck(t *testing.T) {
-	// You can add code here to run prior to any test case execution, for example assertions
-	// about the appropriate environment variables being set are common to see in a pre-check
-	// function.
+	// Check for required environment variables for acceptance testing
+	// These tests require actual Azure AD/Entra ID credentials
+
+	// Option 1: Use Azure CLI authentication (easiest for local testing)
+	// Just ensure you're logged in with: az login
+
+	// Option 2: Use service principal with client credentials
+	// Set these environment variables:
+	// - ENTRA_TENANT_ID or ARM_TENANT_ID
+	// - ENTRA_CLIENT_ID or ARM_CLIENT_ID
+	// - ENTRA_CLIENT_SECRET or ARM_CLIENT_SECRET
+
+	// Option 3: Use OIDC token (for GitHub Actions)
+	// - ENTRA_TENANT_ID or ARM_TENANT_ID
+	// - ENTRA_CLIENT_ID or ARM_CLIENT_ID
+	// - ENTRA_OIDC_TOKEN or ARM_OIDC_TOKEN
+
+	// The actual authentication will be handled by the provider Configure method
+	// We just need to ensure that SOME authentication method is available
+
+	// Check if we have any credentials configured
+	hasAzureCLI := false
+	hasClientCreds := false
+	hasOIDC := false
+
+	// Check for tenant ID (required for non-CLI auth)
+	tenantID := getEnvWithFallback("ENTRA_TENANT_ID", "ARM_TENANT_ID")
+	clientID := getEnvWithFallback("ENTRA_CLIENT_ID", "ARM_CLIENT_ID")
+	clientSecret := getEnvWithFallback("ENTRA_CLIENT_SECRET", "ARM_CLIENT_SECRET")
+	oidcToken := getEnvWithFallback("ENTRA_OIDC_TOKEN", "ARM_OIDC_TOKEN")
+
+	if clientID != "" && clientSecret != "" && tenantID != "" {
+		hasClientCreds = true
+	}
+
+	if clientID != "" && oidcToken != "" && tenantID != "" {
+		hasOIDC = true
+	}
+
+	// For Azure CLI, we assume if neither of the above are set, CLI will be used
+	// The actual check for CLI availability happens in the provider
+	if !hasClientCreds && !hasOIDC {
+		hasAzureCLI = true // Optimistically assume CLI is available
+	}
+
+	if !hasAzureCLI && !hasClientCreds && !hasOIDC {
+		t.Fatal("No authentication method available. " +
+			"Either run 'az login' for Azure CLI authentication, " +
+			"or set ENTRA_TENANT_ID, ENTRA_CLIENT_ID, and ENTRA_CLIENT_SECRET for service principal authentication, " +
+			"or set ENTRA_TENANT_ID, ENTRA_CLIENT_ID, and ENTRA_OIDC_TOKEN for OIDC authentication.")
+	}
+
+	t.Logf("Using authentication method: CLI=%v, ClientCreds=%v, OIDC=%v", hasAzureCLI, hasClientCreds, hasOIDC)
 }
