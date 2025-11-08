@@ -314,17 +314,55 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 		return
 	}
 
-	// Set the ID and schedule ID
+	// Set the request ID
 	if result.GetId() != nil {
 		data.ID = types.StringPointerValue(result.GetId())
 	}
 
-	if result.GetTargetScheduleId() != nil {
-		data.ScheduleID = types.StringPointerValue(result.GetTargetScheduleId())
+	// Wait for the schedule to be created (the request is processed asynchronously)
+	// Retry for up to 30 seconds
+	var schedule models.UnifiedRoleEligibilityScheduleable
+	maxRetries := 15
+	retryDelay := 2 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			tflog.Debug(ctx, "Waiting for schedule to be created", map[string]any{
+				"attempt": i + 1,
+				"max":     maxRetries,
+			})
+			time.Sleep(retryDelay)
+		}
+
+		schedule, err = r.client.FindRoleEligibilitySchedule(ctx, principalID, roleDefID, dirScopeID)
+		if err == nil && schedule != nil {
+			break
+		}
+	}
+
+	if schedule == nil {
+		resp.Diagnostics.AddWarning(
+			"Schedule Not Yet Available",
+			"The role eligibility schedule request was created but the schedule is not yet available. "+
+				"This is normal for PIM operations. The schedule will appear on the next refresh.",
+		)
+		// Set what we have from the request
+		if result.GetTargetScheduleId() != nil {
+			data.ScheduleID = types.StringPointerValue(result.GetTargetScheduleId())
+		}
+	} else {
+		// Successfully found the schedule
+		if schedule.GetId() != nil {
+			data.ScheduleID = types.StringPointerValue(schedule.GetId())
+		}
+		tflog.Info(ctx, "Schedule created and available", map[string]any{
+			"schedule_id": data.ScheduleID.ValueString(),
+		})
 	}
 
 	tflog.Trace(ctx, "Created directory role eligible assignment", map[string]any{
-		"id": data.ID.ValueString(),
+		"id":          data.ID.ValueString(),
+		"schedule_id": data.ScheduleID.ValueString(),
 	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
