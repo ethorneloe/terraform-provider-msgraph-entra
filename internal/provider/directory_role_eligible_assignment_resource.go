@@ -129,9 +129,12 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 						MarkdownDescription: "When and how the eligibility expires.",
 						Attributes: map[string]schema.Attribute{
 							"type": schema.StringAttribute{
-								MarkdownDescription: "The type of expiration: 'noExpiration', 'afterDateTime', or 'afterDuration'.",
+								MarkdownDescription: "The type of expiration: 'noExpiration', 'afterDateTime', or 'afterDuration'. Note: Azure may convert 'afterDuration' to 'afterDateTime'.",
 								Optional:            true,
 								Computed:            true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
 							},
 							"end_date_time": schema.StringAttribute{
 								MarkdownDescription: "The end date/time when type is 'afterDateTime'. Must be in RFC3339 format. Note: Azure may adjust this value slightly.",
@@ -142,8 +145,12 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 								},
 							},
 							"duration": schema.StringAttribute{
-								MarkdownDescription: "The duration when type is 'afterDuration'. Use ISO 8601 duration format (e.g., 'PT8H' for 8 hours, 'P365D' for 365 days).",
+								MarkdownDescription: "The duration when type is 'afterDuration'. Use ISO 8601 duration format (e.g., 'PT8H' for 8 hours, 'P365D' for 365 days). Note: Azure often converts this to an end_date_time.",
 								Optional:            true,
+								Computed:            true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
 							},
 						},
 					},
@@ -185,79 +192,8 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 		data.DirectoryScopeID = types.StringValue("/")
 	}
 
-	// Check if an assignment already exists for this principal+role+scope combination
-	// This improves idempotency and allows for import scenarios
-	existingSchedule, err := r.client.FindRoleEligibilitySchedule(
-		ctx,
-		data.PrincipalID.ValueString(),
-		data.RoleDefinitionID.ValueString(),
-		data.DirectoryScopeID.ValueString(),
-	)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Checking for Existing Assignment",
-			"Could not check for existing role eligible assignment: "+err.Error(),
-		)
-		return
-	}
-
-	if existingSchedule != nil {
-		// Assignment already exists - import it into state instead of creating a new one
-		tflog.Info(ctx, "Assignment already exists, importing into state", map[string]any{
-			"schedule_id": *existingSchedule.GetId(),
-		})
-
-		if existingSchedule.GetId() != nil {
-			data.ScheduleID = types.StringPointerValue(existingSchedule.GetId())
-		}
-
-		// Create a pseudo request ID (we don't have the original request)
-		data.ID = data.ScheduleID
-
-		// Populate schedule info from the existing schedule
-		if existingSchedule.GetScheduleInfo() != nil {
-			scheduleInfo := existingSchedule.GetScheduleInfo()
-			if data.ScheduleInfo == nil {
-				data.ScheduleInfo = &ScheduleInfoModel{}
-			}
-
-			if scheduleInfo.GetStartDateTime() != nil {
-				data.ScheduleInfo.StartDateTime = types.StringValue(scheduleInfo.GetStartDateTime().Format(time.RFC3339))
-			}
-
-			if scheduleInfo.GetExpiration() != nil {
-				expiration := scheduleInfo.GetExpiration()
-				if data.ScheduleInfo.Expiration == nil {
-					data.ScheduleInfo.Expiration = &ExpirationModel{}
-				}
-
-				if expiration.GetTypeEscaped() != nil {
-					switch *expiration.GetTypeEscaped() {
-					case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
-						data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
-					case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
-						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
-					case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
-						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
-					}
-				}
-
-				if expiration.GetEndDateTime() != nil {
-					data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
-				}
-
-				if expiration.GetDuration() != nil {
-					data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
-				}
-			}
-		}
-
-		tflog.Info(ctx, "Successfully imported existing assignment into state")
-		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-		return
-	}
-
 	// Create the role eligibility schedule request
+	// If an assignment already exists, the API will return an error directing users to import it
 	request := models.NewUnifiedRoleEligibilityScheduleRequest()
 
 	action := models.ADMINASSIGN_UNIFIEDROLESCHEDULEREQUESTACTIONS

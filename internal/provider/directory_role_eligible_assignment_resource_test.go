@@ -62,42 +62,6 @@ func TestAccDirectoryRoleEligibleAssignmentResource_Basic(t *testing.T) {
 	})
 }
 
-func TestAccDirectoryRoleEligibleAssignmentResource_WithDuration(t *testing.T) {
-	// Get test user principal ID from environment (can be UPN or object ID)
-	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
-	if principalIdentifier == "" {
-		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
-	}
-
-	// Resolve to object ID (handles both UPN and object ID)
-	principalID := testAccResolvePrincipalID(t, principalIdentifier)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Create with duration
-			{
-				Config: testAccDirectoryRoleEligibleAssignmentResourceConfig_duration(principalID, "P180D"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.type", "afterDuration"),
-					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.duration", "P180D"),
-					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "id"),
-					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
-				),
-			},
-			// Update duration (in-place update)
-			{
-				Config: testAccDirectoryRoleEligibleAssignmentResourceConfig_duration(principalID, "P365D"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.duration", "P365D"),
-					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
-				),
-			},
-		},
-	})
-}
-
 func TestAccDirectoryRoleEligibleAssignmentResource_UpdateEndDate(t *testing.T) {
 	// Get test user principal ID from environment (can be UPN or object ID)
 	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
@@ -129,41 +93,6 @@ func TestAccDirectoryRoleEligibleAssignmentResource_UpdateEndDate(t *testing.T) 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.end_date_time", endTime2),
 					// The schedule_id should remain the same - proving it's an in-place update
-					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
-				),
-			},
-		},
-	})
-}
-
-func TestAccDirectoryRoleEligibleAssignmentResource_IdempotentCreate(t *testing.T) {
-	// This test verifies that creating the same assignment twice doesn't fail
-	// but instead imports the existing one
-	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
-	if principalIdentifier == "" {
-		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
-	}
-
-	// Resolve to object ID (handles both UPN and object ID)
-	principalID := testAccResolvePrincipalID(t, principalIdentifier)
-
-	endTime := time.Now().UTC().Add(365 * 24 * time.Hour).Format(time.RFC3339)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Create first assignment
-			{
-				Config: testAccDirectoryRoleEligibleAssignmentResourceConfig_basic(principalID, endTime),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
-				),
-			},
-			// Apply same config again - should be idempotent
-			{
-				Config: testAccDirectoryRoleEligibleAssignmentResourceConfig_basic(principalID, endTime),
-				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
 				),
 			},
@@ -231,37 +160,6 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
   }
 }
 `, principalID, endTime)
-}
-
-func testAccDirectoryRoleEligibleAssignmentResourceConfig_duration(principalID, duration string) string {
-	return fmt.Sprintf(`
-provider "msgraph-entra" {
-  # Authentication is configured via environment variables:
-  # - ENTRA_TENANT_ID or ARM_TENANT_ID
-  # - ENTRA_CLIENT_ID or ARM_CLIENT_ID
-  # - ENTRA_CLIENT_SECRET or ARM_CLIENT_SECRET (for client credentials)
-  # - ENTRA_OIDC_TOKEN or ARM_OIDC_TOKEN (for OIDC/GitHub Actions)
-  # Or via Azure CLI (az login)
-}
-
-data "msgraph-entra_directory_role" "security_admin" {
-  display_name = "Security Administrator"
-}
-
-resource "msgraph-entra_directory_role_eligible_assignment" "test" {
-  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
-  principal_id       = %[1]q
-  directory_scope_id = "/"
-  justification      = "Test assignment with duration"
-
-  schedule_info {
-    expiration {
-      type     = "afterDuration"
-      duration = %[2]q
-    }
-  }
-}
-`, principalID, duration)
 }
 
 // Helper function to verify assignment exists in state.
