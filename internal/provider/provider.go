@@ -40,7 +40,7 @@ type EntraProviderModel struct {
 }
 
 func (p *EntraProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "msgraph_entra"
+	resp.TypeName = "msgraph-entra"
 	resp.Version = p.version
 }
 

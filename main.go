@@ -8,8 +8,8 @@ import (
 	"flag"
 	"log"
 
+	"github.com/ethorneloe/terraform-provider-msgraph-entra/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/yourusername/terraform-provider-msgraph-entra/internal/provider"
 )
 
 var (
@@ -28,7 +28,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/yourusername/msgraph-entra",
+		Address: "registry.terraform.io/ethorneloe/msgraph-entra",
 		Debug:   debug,
 	}
 
