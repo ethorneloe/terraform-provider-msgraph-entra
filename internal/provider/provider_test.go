@@ -122,7 +122,7 @@ func testAccResolvePrincipalID(t *testing.T, principalIdentifier string) string 
 		}
 		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", ghToken, false, false)
 	} else if clientSecret != "" {
-		graphClient, err = NewGraphClient(ctx, tenantID, clientID, clientSecret, oidcToken, false, false)
+		graphClient, err = NewGraphClient(ctx, tenantID, clientID, clientSecret, "", false, false)
 	} else {
 		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", "", true, false)
 	}
