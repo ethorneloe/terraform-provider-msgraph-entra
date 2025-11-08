@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -105,6 +106,9 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 			"schedule_id": schema.StringAttribute{
 				MarkdownDescription: "The ID of the created role eligibility schedule.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -358,10 +362,49 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 			data.ScheduleID = types.StringPointerValue(result.GetTargetScheduleId())
 		}
 	} else {
-		// Successfully found the schedule
+		// Successfully found the schedule - populate all fields from the actual schedule
 		if schedule.GetId() != nil {
 			data.ScheduleID = types.StringPointerValue(schedule.GetId())
 		}
+
+		// Update schedule info from the actual schedule
+		if schedule.GetScheduleInfo() != nil {
+			scheduleInfo := schedule.GetScheduleInfo()
+			if data.ScheduleInfo == nil {
+				data.ScheduleInfo = &ScheduleInfoModel{}
+			}
+
+			if scheduleInfo.GetStartDateTime() != nil {
+				data.ScheduleInfo.StartDateTime = types.StringValue(scheduleInfo.GetStartDateTime().Format(time.RFC3339))
+			}
+
+			if scheduleInfo.GetExpiration() != nil {
+				expiration := scheduleInfo.GetExpiration()
+				if data.ScheduleInfo.Expiration == nil {
+					data.ScheduleInfo.Expiration = &ExpirationModel{}
+				}
+
+				if expiration.GetTypeEscaped() != nil {
+					switch *expiration.GetTypeEscaped() {
+					case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
+					case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
+					case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
+					}
+				}
+
+				if expiration.GetEndDateTime() != nil {
+					data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
+				}
+
+				if expiration.GetDuration() != nil {
+					data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
+				}
+			}
+		}
+
 		tflog.Info(ctx, "Schedule created and available", map[string]any{
 			"schedule_id": data.ScheduleID.ValueString(),
 		})
@@ -639,6 +682,14 @@ func (r *DirectoryRoleEligibleAssignmentResource) Delete(ctx context.Context, re
 	)
 
 	if err != nil {
+		// If the assignment doesn't exist, that's actually success for a delete operation
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "does not exist") || strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "NotFound") {
+			tflog.Warn(ctx, "Role assignment already deleted or not found", map[string]any{
+				"schedule_id": data.ScheduleID.ValueString(),
+			})
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error Deleting Role Eligible Assignment",
 			"Could not delete role eligible assignment: "+err.Error(),
