@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -78,27 +79,51 @@ func NewGraphClient(ctx context.Context, tenantID, clientID, clientSecret, oidcT
 	}, nil
 }
 
-// GetDirectoryRole retrieves a directory role by display name or template ID.
+// GetDirectoryRole retrieves a directory role template by display name or template ID.
+// This returns the role template information needed for creating PIM eligible assignments.
+// The function searches directory role templates, not activated roles, since we only need
+// the template ID for PIM operations. Template IDs are matched exactly (case-sensitive),
+// while display names are matched case-insensitively.
 func (c *GraphClient) GetDirectoryRole(ctx context.Context, roleIdentifier string) (models.DirectoryRoleable, error) {
-	// Try to get by template ID first.
-	roles, err := c.client.DirectoryRoles().Get(ctx, nil)
+	// Search directory role templates
+	// These are the built-in role definitions available in Entra ID
+	templates, err := c.client.DirectoryRoleTemplates().Get(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list directory roles: %w", err)
+		return nil, fmt.Errorf("failed to list directory role templates: %w", err)
 	}
 
-	for _, role := range roles.GetValue() {
-		roleTemplateID := role.GetRoleTemplateId()
-		displayName := role.GetDisplayName()
+	// Convert identifier to lowercase for case-insensitive display name matching
+	lowerIdentifier := strings.ToLower(roleIdentifier)
 
-		if roleTemplateID != nil && *roleTemplateID == roleIdentifier {
-			return role, nil
+	for _, template := range templates.GetValue() {
+		templateID := template.GetId()
+		displayName := template.GetDisplayName()
+
+		// Match by template ID (exact match, case-sensitive)
+		if templateID != nil && *templateID == roleIdentifier {
+			return convertTemplateToDirectoryRole(template), nil
 		}
-		if displayName != nil && *displayName == roleIdentifier {
-			return role, nil
+
+		// Match by display name (case-insensitive)
+		if displayName != nil && strings.ToLower(*displayName) == lowerIdentifier {
+			return convertTemplateToDirectoryRole(template), nil
 		}
 	}
 
-	return nil, fmt.Errorf("directory role not found: %s", roleIdentifier)
+	return nil, fmt.Errorf("directory role template not found: %s", roleIdentifier)
+}
+
+// convertTemplateToDirectoryRole creates a DirectoryRole object from a template.
+// For PIM eligible assignments, we only need the template ID which is stored in both
+// the Id and RoleTemplateId fields for compatibility.
+func convertTemplateToDirectoryRole(template models.DirectoryRoleTemplateable) models.DirectoryRoleable {
+	role := models.NewDirectoryRole()
+	templateID := template.GetId()
+	role.SetId(templateID)
+	role.SetDisplayName(template.GetDisplayName())
+	role.SetDescription(template.GetDescription())
+	role.SetRoleTemplateId(templateID)
+	return role
 }
 
 // GetDirectoryRoleDefinition retrieves a role definition by ID.
