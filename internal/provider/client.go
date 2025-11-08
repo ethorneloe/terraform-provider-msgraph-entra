@@ -20,13 +20,24 @@ type GraphClient struct {
 }
 
 // NewGraphClient creates a new Microsoft Graph API client.
-func NewGraphClient(ctx context.Context, tenantID, clientID, clientSecret, oidcToken string, useCLI bool) (*GraphClient, error) {
+func NewGraphClient(ctx context.Context, tenantID, clientID, clientSecret, oidcToken string, useCLI, useWorkloadIdentity bool) (*GraphClient, error) {
 	var credential azcore.TokenCredential
 	var err error
 
 	// Support multiple authentication methods
-	if oidcToken != "" {
+	if useWorkloadIdentity {
 		// OIDC/Workload Identity Federation (GitHub Actions, etc.)
+		// This automatically detects ACTIONS_ID_TOKEN_REQUEST_URL and ACTIONS_ID_TOKEN_REQUEST_TOKEN
+		credential, err = azidentity.NewWorkloadIdentityCredential(&azidentity.WorkloadIdentityCredentialOptions{
+			TenantID: tenantID,
+			ClientID: clientID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create workload identity credential: %w", err)
+		}
+	} else if oidcToken != "" {
+		// OIDC/Workload Identity Federation with explicit token
+		// If oidcToken is explicitly provided, use ClientAssertionCredential
 		credential, err = azidentity.NewClientAssertionCredential(
 			tenantID,
 			clientID,

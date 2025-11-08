@@ -40,6 +40,15 @@ func TestAccDirectoryRoleDataSource(t *testing.T) {
 
 func testAccDirectoryRoleDataSourceConfig(displayName string) string {
 	return `
+provider "msgraph-entra" {
+  # Authentication is configured via environment variables:
+  # - ENTRA_TENANT_ID or ARM_TENANT_ID
+  # - ENTRA_CLIENT_ID or ARM_CLIENT_ID
+  # - ENTRA_CLIENT_SECRET or ARM_CLIENT_SECRET (for client credentials)
+  # - ENTRA_OIDC_TOKEN or ARM_OIDC_TOKEN (for OIDC/GitHub Actions)
+  # Or via Azure CLI (az login)
+}
+
 data "msgraph-entra_directory_role" "test" {
   display_name = "` + displayName + `"
 }

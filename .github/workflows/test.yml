@@ -58,6 +58,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Use the 'ci' environment where secrets are stored
+    environment: ci
     # Required for OIDC authentication to Azure
     permissions:
       id-token: write
@@ -83,9 +85,11 @@ jobs:
       - name: Run Acceptance Tests
         env:
           TF_ACC: "1"
+          # Azure authentication via OIDC (GitHub Actions Workload Identity)
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_USE_OIDC: "true"
+          # Test configuration
           TEST_PRINCIPAL_ID: ${{ secrets.TEST_PRINCIPAL_ID }}
         run: go test -v -cover ./internal/provider/
         timeout-minutes: 10

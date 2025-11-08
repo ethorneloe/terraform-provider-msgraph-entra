@@ -166,6 +166,15 @@ func TestAccDirectoryRoleEligibleAssignmentResource_IdempotentCreate(t *testing.
 
 func testAccDirectoryRoleEligibleAssignmentResourceConfig_basic(principalID, startTime, endTime string) string {
 	return fmt.Sprintf(`
+provider "msgraph-entra" {
+  # Authentication is configured via environment variables:
+  # - ENTRA_TENANT_ID or ARM_TENANT_ID
+  # - ENTRA_CLIENT_ID or ARM_CLIENT_ID
+  # - ENTRA_CLIENT_SECRET or ARM_CLIENT_SECRET (for client credentials)
+  # - ENTRA_OIDC_TOKEN or ARM_OIDC_TOKEN (for OIDC/GitHub Actions)
+  # Or via Azure CLI (az login)
+}
+
 data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
@@ -189,6 +198,15 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
 
 func testAccDirectoryRoleEligibleAssignmentResourceConfig_updated(principalID, startTime, endTime string) string {
 	return fmt.Sprintf(`
+provider "msgraph-entra" {
+  # Authentication is configured via environment variables:
+  # - ENTRA_TENANT_ID or ARM_TENANT_ID
+  # - ENTRA_CLIENT_ID or ARM_CLIENT_ID
+  # - ENTRA_CLIENT_SECRET or ARM_CLIENT_SECRET (for client credentials)
+  # - ENTRA_OIDC_TOKEN or ARM_OIDC_TOKEN (for OIDC/GitHub Actions)
+  # Or via Azure CLI (az login)
+}
+
 data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
@@ -212,6 +230,15 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
 
 func testAccDirectoryRoleEligibleAssignmentResourceConfig_duration(principalID, startTime, duration string) string {
 	return fmt.Sprintf(`
+provider "msgraph-entra" {
+  # Authentication is configured via environment variables:
+  # - ENTRA_TENANT_ID or ARM_TENANT_ID
+  # - ENTRA_CLIENT_ID or ARM_CLIENT_ID
+  # - ENTRA_CLIENT_SECRET or ARM_CLIENT_SECRET (for client credentials)
+  # - ENTRA_OIDC_TOKEN or ARM_OIDC_TOKEN (for OIDC/GitHub Actions)
+  # Or via Azure CLI (az login)
+}
+
 data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }

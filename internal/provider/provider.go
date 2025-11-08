@@ -111,6 +111,11 @@ func (p *EntraProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		useCLI = data.UseCLI.ValueBool()
 	}
 
+	// Check for ARM_USE_OIDC environment variable or GitHub Actions OIDC environment
+	useOIDC := getEnvWithFallback("ENTRA_USE_OIDC", "ARM_USE_OIDC") == "true"
+	githubActionsToken := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+	inGitHubActions := githubActionsToken != ""
+
 	// Validate configuration
 	if !useCLI {
 		if tenantID == "" {
@@ -127,13 +132,13 @@ func (p *EntraProvider) Configure(ctx context.Context, req provider.ConfigureReq
 			)
 		}
 
-		// Need either client_secret OR oidc_token
-		if clientSecret == "" && oidcToken == "" {
+		// Need either client_secret OR oidc_token OR GitHub Actions OIDC
+		if clientSecret == "" && oidcToken == "" && !useOIDC && !inGitHubActions {
 			resp.Diagnostics.AddError(
 				"Missing Authentication Credentials",
 				"The provider requires either client_secret or oidc_token when not using Azure CLI authentication. "+
 					"For service principal with secret: set ENTRA_CLIENT_SECRET or ARM_CLIENT_SECRET. "+
-					"For OIDC/Workload Identity (GitHub Actions): set ENTRA_OIDC_TOKEN or ARM_OIDC_TOKEN. "+
+					"For OIDC/Workload Identity (GitHub Actions): set ARM_USE_OIDC=true or ENTRA_OIDC_TOKEN or ARM_OIDC_TOKEN. "+
 					"Alternatively, set use_cli = true to use Azure CLI authentication.",
 			)
 		}
@@ -151,19 +156,27 @@ func (p *EntraProvider) Configure(ctx context.Context, req provider.ConfigureReq
 
 	if useCLI {
 		tflog.Info(ctx, "Using Azure CLI authentication")
-		graphClient, err = NewGraphClient(ctx, "", "", "", "", true)
+		graphClient, err = NewGraphClient(ctx, "", "", "", "", true, false)
 	} else if oidcToken != "" {
-		tflog.Info(ctx, "Using OIDC/Workload Identity authentication", map[string]any{
+		tflog.Info(ctx, "Using OIDC/Workload Identity authentication with explicit token", map[string]any{
 			"tenant_id": tenantID,
 			"client_id": clientID,
 		})
-		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", oidcToken, false)
+		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", oidcToken, false, false)
+	} else if useOIDC || inGitHubActions {
+		tflog.Info(ctx, "Using OIDC/Workload Identity authentication (GitHub Actions)", map[string]any{
+			"tenant_id":         tenantID,
+			"client_id":         clientID,
+			"use_oidc":          useOIDC,
+			"in_github_actions": inGitHubActions,
+		})
+		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", "", false, true)
 	} else {
 		tflog.Info(ctx, "Using client secret authentication", map[string]any{
 			"tenant_id": tenantID,
 			"client_id": clientID,
 		})
-		graphClient, err = NewGraphClient(ctx, tenantID, clientID, clientSecret, "", false)
+		graphClient, err = NewGraphClient(ctx, tenantID, clientID, clientSecret, "", false, false)
 	}
 
 	if err != nil {
