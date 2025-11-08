@@ -167,3 +167,22 @@ func (c *GraphClient) GetRoleEligibilitySchedule(ctx context.Context, scheduleID
 func (c *GraphClient) GetRoleManagementDirectory() *rolemanagement.DirectoryRequestBuilder {
 	return c.client.RoleManagement().Directory()
 }
+
+// FindRoleEligibilitySchedule finds an existing eligible role assignment schedule by principal, role, and scope.
+// Returns nil if no matching schedule is found.
+func (c *GraphClient) FindRoleEligibilitySchedule(ctx context.Context, principalID, roleDefinitionID, directoryScopeID string) (models.UnifiedRoleEligibilityScheduleable, error) {
+	schedules, err := c.ListRoleEligibilitySchedules(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list role eligibility schedules: %w", err)
+	}
+
+	for _, schedule := range schedules {
+		if schedule.GetPrincipalId() != nil && *schedule.GetPrincipalId() == principalID &&
+			schedule.GetRoleDefinitionId() != nil && *schedule.GetRoleDefinitionId() == roleDefinitionID &&
+			schedule.GetDirectoryScopeId() != nil && *schedule.GetDirectoryScopeId() == directoryScopeID {
+			return schedule, nil
+		}
+	}
+
+	return nil, nil // Not found, but not an error
+}

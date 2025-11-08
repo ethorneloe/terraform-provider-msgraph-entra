@@ -208,7 +208,7 @@ func New(version string) func() provider.Provider {
 	}
 }
 
-// getEnvWithFallback returns the value of the primary environment variable, or falls back to the secondary if not set
+// getEnvWithFallback returns the value of the primary environment variable, or falls back to the secondary if not set.
 func getEnvWithFallback(primary, secondary string) string {
 	if value := os.Getenv(primary); value != "" {
 		return value

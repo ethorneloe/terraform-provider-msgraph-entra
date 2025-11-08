@@ -27,10 +27,10 @@ type DirectoryRoleDataSource struct {
 
 // DirectoryRoleDataSourceModel describes the data source data model.
 type DirectoryRoleDataSourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	DisplayName    types.String `tfsdk:"display_name"`
-	TemplateID     types.String `tfsdk:"template_id"`
-	Description    types.String `tfsdk:"description"`
+	ID          types.String `tfsdk:"id"`
+	DisplayName types.String `tfsdk:"display_name"`
+	TemplateID  types.String `tfsdk:"template_id"`
+	Description types.String `tfsdk:"description"`
 }
 
 func (d *DirectoryRoleDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
