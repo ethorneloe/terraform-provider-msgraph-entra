@@ -283,7 +283,7 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 
 		// Start date time
 		var startDateTime time.Time
-		if !data.ScheduleInfo.StartDateTime.IsNull() {
+		if !data.ScheduleInfo.StartDateTime.IsNull() && data.ScheduleInfo.StartDateTime.ValueString() != "" {
 			var err error
 			startDateTime, err = time.Parse(time.RFC3339, data.ScheduleInfo.StartDateTime.ValueString())
 			if err != nil {
@@ -605,7 +605,7 @@ func (r *DirectoryRoleEligibleAssignmentResource) Update(ctx context.Context, re
 
 		// Start date time
 		var startDateTime time.Time
-		if !plan.ScheduleInfo.StartDateTime.IsNull() {
+		if !plan.ScheduleInfo.StartDateTime.IsNull() && plan.ScheduleInfo.StartDateTime.ValueString() != "" {
 			var err error
 			startDateTime, err = time.Parse(time.RFC3339, plan.ScheduleInfo.StartDateTime.ValueString())
 			if err != nil {
