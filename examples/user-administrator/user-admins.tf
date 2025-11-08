@@ -1,0 +1,62 @@
+# User Administrator Role - Eligible Assignments
+# This file manages all eligible assignments for the User Administrator role
+
+# Data source to look up the User Administrator role
+data "msgraph_entra_directory_role" "user_administrator" {
+  display_name = "User Administrator"
+}
+
+# Define the list of users who should have eligible access to User Administrator role
+locals {
+  user_admins = [
+    {
+      upn           = "helpdesk.lead@contoso.com"
+      justification = "Help desk lead - user account management"
+      start_date    = "2025-01-08T00:00:00Z"
+      duration      = "P180D"  # 180 days (6 months)
+    },
+    {
+      upn           = "hr.admin@contoso.com"
+      justification = "HR admin - onboarding/offboarding coordination"
+      start_date    = "2025-01-08T00:00:00Z"
+      duration      = "P365D"  # 1 year
+    },
+  ]
+}
+
+# Look up each user by UPN
+data "azuread_user" "user_admins" {
+  for_each            = { for admin in local.user_admins : admin.upn => admin }
+  user_principal_name = each.value.upn
+}
+
+# Create eligible role assignments for each user
+resource "msgraph_entra_directory_role_eligible_assignment" "user_admins" {
+  for_each = { for admin in local.user_admins : admin.upn => admin }
+
+  role_definition_id = data.msgraph_entra_directory_role.user_administrator.template_id
+  principal_id       = data.azuread_user.user_admins[each.key].id
+  directory_scope_id = "/"
+  justification      = each.value.justification
+
+  schedule_info {
+    start_date_time = each.value.start_date
+
+    expiration {
+      type     = "afterDuration"
+      duration = each.value.duration
+    }
+  }
+}
+
+# Output the created assignments for verification
+output "user_admin_assignments" {
+  value = {
+    for k, v in entra_directory_role_eligible_assignment.user_admins :
+    k => {
+      id          = v.id
+      schedule_id = v.schedule_id
+    }
+  }
+  description = "Map of User Administrator eligible role assignments"
+}
