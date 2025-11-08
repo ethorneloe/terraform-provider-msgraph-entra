@@ -14,11 +14,14 @@ import (
 )
 
 func TestAccDirectoryRoleEligibleAssignmentResource_Basic(t *testing.T) {
-	// Get test user principal ID from environment
-	principalID := os.Getenv("TEST_PRINCIPAL_ID")
-	if principalID == "" {
+	// Get test user principal ID from environment (can be UPN or object ID)
+	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
+	if principalIdentifier == "" {
 		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
 	}
+
+	// Resolve to object ID (handles both UPN and object ID)
+	principalID := testAccResolvePrincipalID(t, principalIdentifier)
 
 	startTime := time.Now().UTC().Format(time.RFC3339)
 	endTime := time.Now().UTC().Add(365 * 24 * time.Hour).Format(time.RFC3339)
@@ -61,11 +64,14 @@ func TestAccDirectoryRoleEligibleAssignmentResource_Basic(t *testing.T) {
 }
 
 func TestAccDirectoryRoleEligibleAssignmentResource_WithDuration(t *testing.T) {
-	// Get test user principal ID from environment
-	principalID := os.Getenv("TEST_PRINCIPAL_ID")
-	if principalID == "" {
+	// Get test user principal ID from environment (can be UPN or object ID)
+	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
+	if principalIdentifier == "" {
 		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
 	}
+
+	// Resolve to object ID (handles both UPN and object ID)
+	principalID := testAccResolvePrincipalID(t, principalIdentifier)
 
 	startTime := time.Now().UTC().Format(time.RFC3339)
 
@@ -96,11 +102,14 @@ func TestAccDirectoryRoleEligibleAssignmentResource_WithDuration(t *testing.T) {
 }
 
 func TestAccDirectoryRoleEligibleAssignmentResource_UpdateEndDate(t *testing.T) {
-	// Get test user principal ID from environment
-	principalID := os.Getenv("TEST_PRINCIPAL_ID")
-	if principalID == "" {
+	// Get test user principal ID from environment (can be UPN or object ID)
+	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
+	if principalIdentifier == "" {
 		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
 	}
+
+	// Resolve to object ID (handles both UPN and object ID)
+	principalID := testAccResolvePrincipalID(t, principalIdentifier)
 
 	startTime := time.Now().UTC().Format(time.RFC3339)
 	endTime1 := time.Now().UTC().Add(180 * 24 * time.Hour).Format(time.RFC3339)
@@ -134,10 +143,13 @@ func TestAccDirectoryRoleEligibleAssignmentResource_UpdateEndDate(t *testing.T) 
 func TestAccDirectoryRoleEligibleAssignmentResource_IdempotentCreate(t *testing.T) {
 	// This test verifies that creating the same assignment twice doesn't fail
 	// but instead imports the existing one
-	principalID := os.Getenv("TEST_PRINCIPAL_ID")
-	if principalID == "" {
+	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
+	if principalIdentifier == "" {
 		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
 	}
+
+	// Resolve to object ID (handles both UPN and object ID)
+	principalID := testAccResolvePrincipalID(t, principalIdentifier)
 
 	startTime := time.Now().UTC().Format(time.RFC3339)
 	endTime := time.Now().UTC().Add(365 * 24 * time.Hour).Format(time.RFC3339)

@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -88,4 +89,53 @@ func testAccPreCheck(t *testing.T) {
 	}
 
 	t.Logf("Using authentication method: CLI=%v, ClientCreds=%v, OIDC=%v", hasAzureCLI, hasClientCreds, hasOIDC)
+}
+
+//nolint:unused // Used by acceptance tests in _test.go files
+func testAccResolvePrincipalID(t *testing.T, principalIdentifier string) string {
+	// If it's already a GUID (object ID), return as-is
+	// GUIDs are 36 characters: 8-4-4-4-12 with dashes
+	if len(principalIdentifier) == 36 && principalIdentifier[8] == '-' && principalIdentifier[13] == '-' {
+		return principalIdentifier
+	}
+
+	// Otherwise, assume it's a UPN and resolve it to object ID
+	t.Logf("Resolving UPN %s to object ID", principalIdentifier)
+
+	// Create a temporary Graph client to resolve the UPN
+	ctx := context.Background()
+	tenantID := getEnvWithFallback("ENTRA_TENANT_ID", "ARM_TENANT_ID")
+	clientID := getEnvWithFallback("ENTRA_CLIENT_ID", "ARM_CLIENT_ID")
+	clientSecret := getEnvWithFallback("ENTRA_CLIENT_SECRET", "ARM_CLIENT_SECRET")
+	oidcToken := getEnvWithFallback("ENTRA_OIDC_TOKEN", "ARM_OIDC_TOKEN")
+	useOIDC := getEnvWithFallback("ENTRA_USE_OIDC", "ARM_USE_OIDC") == "true"
+
+	var graphClient *GraphClient
+	var err error
+
+	// Try OIDC first (for GitHub Actions)
+	if useOIDC {
+		// Fetch OIDC token from GitHub Actions
+		ghToken, ghErr := getGitHubActionsOIDCToken(ctx)
+		if ghErr != nil {
+			t.Fatalf("Failed to fetch OIDC token: %v", ghErr)
+		}
+		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", ghToken, false, false)
+	} else if clientSecret != "" {
+		graphClient, err = NewGraphClient(ctx, tenantID, clientID, clientSecret, oidcToken, false, false)
+	} else {
+		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", "", true, false)
+	}
+
+	if err != nil {
+		t.Fatalf("Failed to create Graph client: %v", err)
+	}
+
+	objectID, err := graphClient.GetUserByUserPrincipalName(ctx, principalIdentifier)
+	if err != nil {
+		t.Fatalf("Failed to resolve UPN %s to object ID: %v", principalIdentifier, err)
+	}
+
+	t.Logf("Resolved UPN %s to object ID %s", principalIdentifier, objectID)
+	return objectID
 }

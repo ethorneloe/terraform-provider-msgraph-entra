@@ -194,6 +194,21 @@ func (c *GraphClient) GetRoleManagementDirectory() *rolemanagement.DirectoryRequ
 	return c.client.RoleManagement().Directory()
 }
 
+// GetUserByUserPrincipalName retrieves a user's object ID by their UPN (email address).
+// This is useful for converting user-friendly UPNs to object IDs required by the Graph API.
+func (c *GraphClient) GetUserByUserPrincipalName(ctx context.Context, upn string) (string, error) {
+	user, err := c.client.Users().ByUserId(upn).Get(ctx, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get user by UPN %s: %w", upn, err)
+	}
+
+	if user.GetId() == nil {
+		return "", fmt.Errorf("user %s has no object ID", upn)
+	}
+
+	return *user.GetId(), nil
+}
+
 // FindRoleEligibilitySchedule finds an existing eligible role assignment schedule by principal, role, and scope.
 // Returns nil if no matching schedule is found.
 func (c *GraphClient) FindRoleEligibilitySchedule(ctx context.Context, principalID, roleDefinitionID, directoryScopeID string) (models.UnifiedRoleEligibilityScheduleable, error) {
