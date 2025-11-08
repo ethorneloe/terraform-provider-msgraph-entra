@@ -106,18 +106,20 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 				MarkdownDescription: "The ID of the created role eligibility schedule.",
 				Computed:            true,
 			},
-			"schedule_info": schema.SingleNestedAttribute{
+		},
+		Blocks: map[string]schema.Block{
+			"schedule_info": schema.SingleNestedBlock{
 				MarkdownDescription: "The schedule of the role eligibility.",
-				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"start_date_time": schema.StringAttribute{
 						MarkdownDescription: "When the eligibility starts. Must be in RFC3339 format (e.g., '2025-01-08T00:00:00Z'). Defaults to now.",
 						Optional:            true,
 						Computed:            true,
 					},
-					"expiration": schema.SingleNestedAttribute{
+				},
+				Blocks: map[string]schema.Block{
+					"expiration": schema.SingleNestedBlock{
 						MarkdownDescription: "When and how the eligibility expires.",
-						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"type": schema.StringAttribute{
 								MarkdownDescription: "The type of expiration: 'noExpiration', 'afterDateTime', or 'afterDuration'.",

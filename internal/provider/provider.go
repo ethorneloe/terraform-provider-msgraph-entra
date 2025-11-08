@@ -5,6 +5,10 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -164,13 +168,28 @@ func (p *EntraProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		})
 		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", oidcToken, false, false)
 	} else if useOIDC || inGitHubActions {
-		tflog.Info(ctx, "Using OIDC/Workload Identity authentication (GitHub Actions)", map[string]any{
+		// Fetch OIDC token from GitHub Actions
+		tflog.Info(ctx, "Attempting to fetch OIDC token from GitHub Actions", map[string]any{
 			"tenant_id":         tenantID,
 			"client_id":         clientID,
 			"use_oidc":          useOIDC,
 			"in_github_actions": inGitHubActions,
 		})
-		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", "", false, true)
+
+		ghToken, ghErr := getGitHubActionsOIDCToken(ctx)
+		if ghErr != nil {
+			tflog.Warn(ctx, "Failed to fetch GitHub Actions OIDC token", map[string]any{
+				"error": ghErr.Error(),
+			})
+			resp.Diagnostics.AddError(
+				"Failed to Fetch GitHub Actions OIDC Token",
+				fmt.Sprintf("Could not fetch OIDC token from GitHub Actions: %s", ghErr.Error()),
+			)
+			return
+		}
+
+		tflog.Info(ctx, "Successfully fetched OIDC token from GitHub Actions")
+		graphClient, err = NewGraphClient(ctx, tenantID, clientID, "", ghToken, false, false)
 	} else {
 		tflog.Info(ctx, "Using client secret authentication", map[string]any{
 			"tenant_id": tenantID,
@@ -227,4 +246,46 @@ func getEnvWithFallback(primary, secondary string) string {
 		return value
 	}
 	return os.Getenv(secondary)
+}
+
+// getGitHubActionsOIDCToken fetches an OIDC token from GitHub Actions.
+// Returns the token string and nil error on success, or empty string and error on failure.
+func getGitHubActionsOIDCToken(ctx context.Context) (string, error) {
+	requestURL := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_URL")
+	requestToken := os.Getenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+
+	if requestURL == "" || requestToken == "" {
+		return "", fmt.Errorf("GitHub Actions OIDC environment variables not found")
+	}
+
+	// Request OIDC token from GitHub Actions
+	req, err := http.NewRequestWithContext(ctx, "GET", requestURL+"&audience=api://AzureADTokenExchange", nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+requestToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to request token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to get token, status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Value string `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if result.Value == "" {
+		return "", fmt.Errorf("token value is empty")
+	}
+
+	return result.Value, nil
 }
