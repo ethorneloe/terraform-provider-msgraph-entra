@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # PowerShell script to set up development overrides
 # This is the easiest way for local development
 

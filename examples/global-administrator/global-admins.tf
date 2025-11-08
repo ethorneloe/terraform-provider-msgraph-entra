@@ -15,13 +15,13 @@ locals {
       upn           = "admin.breakglass1@contoso.com"
       justification = "Break-glass account #1 - emergency access only"
       start_date    = "2025-01-08T00:00:00Z"
-      duration      = "P365D"  # 365 days
+      duration      = "P365D" # 365 days
     },
     {
       upn           = "admin.breakglass2@contoso.com"
       justification = "Break-glass account #2 - emergency access only"
       start_date    = "2025-01-08T00:00:00Z"
-      duration      = "P365D"  # 365 days
+      duration      = "P365D" # 365 days
     },
   ]
 }

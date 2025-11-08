@@ -13,13 +13,13 @@ locals {
       upn           = "helpdesk.lead@contoso.com"
       justification = "Help desk lead - user account management"
       start_date    = "2025-01-08T00:00:00Z"
-      duration      = "P180D"  # 180 days (6 months)
+      duration      = "P180D" # 180 days (6 months)
     },
     {
       upn           = "hr.admin@contoso.com"
       justification = "HR admin - onboarding/offboarding coordination"
       start_date    = "2025-01-08T00:00:00Z"
-      duration      = "P365D"  # 1 year
+      duration      = "P365D" # 1 year
     },
   ]
 }

@@ -57,12 +57,12 @@ locals {
     {
       upn           = "security.lead@contoso.com"
       justification = "Security operations lead - incident response and security monitoring"
-      duration      = "P365D"  # 1 year
+      duration      = "P365D" # 1 year
     },
     {
       upn           = "security.analyst@contoso.com"
       justification = "SOC analyst - security investigations"
-      duration      = "P180D"  # 6 months
+      duration      = "P180D" # 6 months
     },
   ]
 }

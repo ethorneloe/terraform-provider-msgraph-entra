@@ -63,12 +63,14 @@ func testAccPreCheck(t *testing.T) {
 	clientID := getEnvWithFallback("ENTRA_CLIENT_ID", "ARM_CLIENT_ID")
 	clientSecret := getEnvWithFallback("ENTRA_CLIENT_SECRET", "ARM_CLIENT_SECRET")
 	oidcToken := getEnvWithFallback("ENTRA_OIDC_TOKEN", "ARM_OIDC_TOKEN")
+	useOIDC := getEnvWithFallback("ENTRA_USE_OIDC", "ARM_USE_OIDC") == "true"
 
 	if clientID != "" && clientSecret != "" && tenantID != "" {
 		hasClientCreds = true
 	}
 
-	if clientID != "" && oidcToken != "" && tenantID != "" {
+	// OIDC is available if we have explicit token OR if ARM_USE_OIDC=true (GitHub Actions)
+	if clientID != "" && tenantID != "" && (oidcToken != "" || useOIDC) {
 		hasOIDC = true
 	}
 
