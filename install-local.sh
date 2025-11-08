@@ -46,15 +46,15 @@ if [ $? -ne 0 ]; then
 fi
 
 # Create plugin directory
-PLUGIN_DIR="$HOME/.terraform.d/plugins/registry.terraform.io/$NAMESPACE/msgraph_entra/$VERSION/${OS}_${ARCH}"
+PLUGIN_DIR="$HOME/.terraform.d/plugins/registry.terraform.io/$NAMESPACE/msgraph-entra/$VERSION/${OS}_${ARCH}"
 
 echo "Creating plugin directory: $PLUGIN_DIR"
 mkdir -p "$PLUGIN_DIR"
 
 # Copy the provider binary
 echo "Copying provider binary..."
-cp terraform-provider-msgraph-entra "$PLUGIN_DIR/terraform-provider-msgraph_entra_v${VERSION}"
-chmod +x "$PLUGIN_DIR/terraform-provider-msgraph_entra_v${VERSION}"
+cp terraform-provider-msgraph-entra "$PLUGIN_DIR/terraform-provider-msgraph-entra_v${VERSION}"
+chmod +x "$PLUGIN_DIR/terraform-provider-msgraph-entra_v${VERSION}"
 
 echo ""
 echo "✅ Provider installed successfully!"
@@ -64,14 +64,14 @@ cat <<EOF
 
 terraform {
   required_providers {
-    msgraph_entra = {
-      source  = "$NAMESPACE/msgraph_entra"
+    msgraph-entra = {
+      source  = "$NAMESPACE/msgraph-entra"
       version = "~> $VERSION"
     }
   }
 }
 
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   # Your configuration
 }
 EOF

@@ -29,7 +29,7 @@ This script will:
    ```hcl
    provider_installation {
      dev_overrides {
-       "yourusername/msgraph_entra" = "C:/Dev/terraform-provider-scaffolding-framework"
+       "yourusername/msgraph-entra" = "C:/Dev/terraform-provider-scaffolding-framework"
      }
 
      # For all other providers, install them directly as normal.
@@ -41,14 +41,14 @@ This script will:
    ```hcl
    terraform {
      required_providers {
-       msgraph_entra = {
-         source = "yourusername/msgraph_entra"
+       msgraph-entra = {
+         source = "yourusername/msgraph-entra"
          # Version is ignored with dev_overrides
        }
      }
    }
 
-   provider "msgraph_entra" {
+   provider "msgraph-entra" {
      # Your configuration
    }
    ```
@@ -98,50 +98,50 @@ Warning: Provider development overrides are in effect
 
    **Windows:**
    ```powershell
-   $PluginDir = "$env:APPDATA\terraform.d\plugins\registry.terraform.io\yourusername\msgraph_entra\1.0.0\windows_amd64"
+   $PluginDir = "$env:APPDATA\terraform.d\plugins\registry.terraform.io\yourusername\msgraph-entra\1.0.0\windows_amd64"
    New-Item -ItemType Directory -Force -Path $PluginDir
    ```
 
    **Linux:**
    ```bash
-   mkdir -p ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph_entra/1.0.0/linux_amd64
+   mkdir -p ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph-entra/1.0.0/linux_amd64
    ```
 
    **Mac (Intel):**
    ```bash
-   mkdir -p ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph_entra/1.0.0/darwin_amd64
+   mkdir -p ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph-entra/1.0.0/darwin_amd64
    ```
 
    **Mac (Apple Silicon):**
    ```bash
-   mkdir -p ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph_entra/1.0.0/darwin_arm64
+   mkdir -p ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph-entra/1.0.0/darwin_arm64
    ```
 
 3. **Copy the provider binary:**
 
    **Windows:**
    ```powershell
-   Copy-Item terraform-provider-msgraph-entra.exe "$PluginDir\terraform-provider-msgraph_entra_v1.0.0.exe"
+   Copy-Item terraform-provider-msgraph-entra.exe "$PluginDir\terraform-provider-msgraph-entra_v1.0.0.exe"
    ```
 
    **Linux/Mac:**
    ```bash
-   cp terraform-provider-msgraph-entra ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph_entra/1.0.0/linux_amd64/terraform-provider-msgraph_entra_v1.0.0
-   chmod +x ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph_entra/1.0.0/linux_amd64/terraform-provider-msgraph_entra_v1.0.0
+   cp terraform-provider-msgraph-entra ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph-entra/1.0.0/linux_amd64/terraform-provider-msgraph-entra_v1.0.0
+   chmod +x ~/.terraform.d/plugins/registry.terraform.io/yourusername/msgraph-entra/1.0.0/linux_amd64/terraform-provider-msgraph-entra_v1.0.0
    ```
 
 4. **Use in your Terraform config:**
    ```hcl
    terraform {
      required_providers {
-       msgraph_entra = {
-         source  = "yourusername/msgraph_entra"
+       msgraph-entra = {
+         source  = "yourusername/msgraph-entra"
          version = "~> 1.0"
        }
      }
    }
 
-   provider "msgraph_entra" {
+   provider "msgraph-entra" {
      # Your configuration
    }
    ```
@@ -175,14 +175,14 @@ Warning: Provider development overrides are in effect
    /shared/terraform-providers/
    └── registry.terraform.io/
        └── yourusername/
-           └── msgraph_entra/
+           └── msgraph-entra/
                └── 1.0.0/
                    ├── windows_amd64/
-                   │   └── terraform-provider-msgraph_entra_v1.0.0.exe
+                   │   └── terraform-provider-msgraph-entra_v1.0.0.exe
                    ├── linux_amd64/
-                   │   └── terraform-provider-msgraph_entra_v1.0.0
+                   │   └── terraform-provider-msgraph-entra_v1.0.0
                    └── darwin_amd64/
-                       └── terraform-provider-msgraph_entra_v1.0.0
+                       └── terraform-provider-msgraph-entra_v1.0.0
    ```
 
 2. **Configure each team member's `.terraformrc`:**
@@ -190,11 +190,11 @@ Warning: Provider development overrides are in effect
    provider_installation {
      filesystem_mirror {
        path    = "/shared/terraform-providers"
-       include = ["yourusername/msgraph_entra"]
+       include = ["yourusername/msgraph-entra"]
      }
 
      direct {
-       exclude = ["yourusername/msgraph_entra"]
+       exclude = ["yourusername/msgraph-entra"]
      }
    }
    ```
@@ -203,8 +203,8 @@ Warning: Provider development overrides are in effect
    ```hcl
    terraform {
      required_providers {
-       msgraph_entra = {
-         source  = "yourusername/msgraph_entra"
+       msgraph-entra = {
+         source  = "yourusername/msgraph-entra"
          version = "~> 1.0"
        }
      }
@@ -244,14 +244,14 @@ Warning: Provider development overrides are in effect
    ```hcl
    terraform {
      required_providers {
-       msgraph_entra = {
-         source  = "terraform.local/local/msgraph_entra"
+       msgraph-entra = {
+         source  = "terraform.local/local/msgraph-entra"
          version = "1.0.0"
        }
      }
    }
 
-   provider "msgraph_entra" {
+   provider "msgraph-entra" {
      # Your configuration
    }
    ```
@@ -259,14 +259,14 @@ Warning: Provider development overrides are in effect
 4. **Create the local plugin structure:**
    ```powershell
    # Windows
-   mkdir -p .terraform\providers\terraform.local\local\msgraph_entra\1.0.0\windows_amd64
-   copy terraform-provider-msgraph-entra.exe .terraform\providers\terraform.local\local\msgraph_entra\1.0.0\windows_amd64\
+   mkdir -p .terraform\providers\terraform.local\local\msgraph-entra\1.0.0\windows_amd64
+   copy terraform-provider-msgraph-entra.exe .terraform\providers\terraform.local\local\msgraph-entra\1.0.0\windows_amd64\
    ```
 
    ```bash
    # Linux/Mac
-   mkdir -p .terraform/providers/terraform.local/local/msgraph_entra/1.0.0/linux_amd64
-   cp terraform-provider-msgraph-entra .terraform/providers/terraform.local/local/msgraph_entra/1.0.0/linux_amd64/
+   mkdir -p .terraform/providers/terraform.local/local/msgraph-entra/1.0.0/linux_amd64
+   cp terraform-provider-msgraph-entra .terraform/providers/terraform.local/local/msgraph-entra/1.0.0/linux_amd64/
    ```
 
 ---
@@ -296,22 +296,22 @@ Create a test Terraform file `test.tf`:
 ```hcl
 terraform {
   required_providers {
-    msgraph_entra = {
-      source = "yourusername/msgraph_entra"
+    msgraph-entra = {
+      source = "yourusername/msgraph-entra"
     }
   }
 }
 
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   use_cli = true  # Use Azure CLI for testing
 }
 
-data "msgraph_entra_directory_role" "test" {
+data "msgraph-entra_directory_role" "test" {
   display_name = "Global Administrator"
 }
 
 output "role_template_id" {
-  value = data.msgraph_entra_directory_role.test.template_id
+  value = data.msgraph-entra_directory_role.test.template_id
 }
 ```
 
@@ -335,7 +335,7 @@ If you see the role template ID in the output, the provider is working! 🎉
 ### "Failed to install provider"
 - Verify the directory structure matches exactly
 - Check file permissions (Linux/Mac: `chmod +x`)
-- Ensure the binary name includes the version: `terraform-provider-msgraph_entra_v1.0.0.exe`
+- Ensure the binary name includes the version: `terraform-provider-msgraph-entra_v1.0.0.exe`
 
 ### "Development overrides warning"
 - This is normal with Method 1 and can be ignored

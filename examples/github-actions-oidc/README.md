@@ -1,6 +1,6 @@
 # GitHub Actions with OIDC Example
 
-This example demonstrates how to use the `msgraph_entra` provider with OIDC (OpenID Connect) authentication in GitHub Actions. This is the **most secure** way to authenticate because **no secrets are stored in GitHub**.
+This example demonstrates how to use the `msgraph-entra` provider with OIDC (OpenID Connect) authentication in GitHub Actions. This is the **most secure** way to authenticate because **no secrets are stored in GitHub**.
 
 ## Why OIDC?
 
@@ -204,7 +204,7 @@ You cannot test OIDC locally (it requires GitHub Actions infrastructure). For lo
 
 ### Option 1: Azure CLI
 ```hcl
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   use_cli = true
 }
 ```
@@ -217,7 +217,7 @@ terraform plan
 
 ### Option 2: Client Secret (Local Only)
 ```hcl
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   tenant_id     = var.tenant_id
   client_id     = var.client_id
   client_secret = var.client_secret  # From environment or tfvars

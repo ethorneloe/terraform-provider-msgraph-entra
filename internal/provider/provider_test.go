@@ -17,17 +17,17 @@ import (
 //
 //nolint:unused // Used by acceptance tests in _test.go files
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"msgraph_entra": providerserver.NewProtocol6WithError(New("test")()),
+	"msgraph-entra": providerserver.NewProtocol6WithError(New("test")()),
 }
 
-// testAccProtoV6ProviderFactoriesWithEcho includes the echo provider alongside the msgraph_entra provider.
+// testAccProtoV6ProviderFactoriesWithEcho includes the echo provider alongside the msgraph-entra provider.
 // It allows for testing assertions on data returned by an ephemeral resource during Open.
 // The echoprovider is used to arrange tests by echoing ephemeral data into the Terraform state.
 // This lets the data be referenced in test assertions with state checks.
 //
 //nolint:unused // Used by acceptance tests in _test.go files when testing ephemeral resources
 var testAccProtoV6ProviderFactoriesWithEcho = map[string]func() (tfprotov6.ProviderServer, error){
-	"msgraph_entra": providerserver.NewProtocol6WithError(New("test")()),
+	"msgraph-entra": providerserver.NewProtocol6WithError(New("test")()),
 	"echo":          echoprovider.NewProviderServer(),
 }
 

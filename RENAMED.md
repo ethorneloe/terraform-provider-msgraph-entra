@@ -1,8 +1,8 @@
-# Provider Renamed to msgraph_entra
+# Provider Renamed to msgraph-entra
 
-The provider has been successfully renamed from `entra` to `msgraph_entra`.
+The provider has been successfully renamed from `entra` to `msgraph-entra`.
 
-## Why msgraph_entra?
+## Why msgraph-entra?
 
 ✅ **Clarity**: Indicates it uses Microsoft Graph API
 ✅ **Specificity**: Shows it's for Entra ID (Azure AD)
@@ -14,10 +14,10 @@ The provider has been successfully renamed from `entra` to `msgraph_entra`.
 ### Core Files
 - ✅ `go.mod` - Module name updated
 - ✅ `main.go` - Registry address updated
-- ✅ `internal/provider/provider.go` - TypeName updated to `msgraph_entra`
+- ✅ `internal/provider/provider.go` - TypeName updated to `msgraph-entra`
 
 ### Binary
-- ✅ Built as `terraform-provider-msgraph_entra.exe`
+- ✅ Built as `terraform-provider-msgraph-entra.exe`
 - ✅ Size: 169MB
 - ✅ Fully functional with OIDC support
 
@@ -40,20 +40,20 @@ The provider has been successfully renamed from `entra` to `msgraph_entra`.
 ```hcl
 terraform {
   required_providers {
-    msgraph_entra = {
-      source  = "yourusername/msgraph_entra"
+    msgraph-entra = {
+      source  = "yourusername/msgraph-entra"
       version = "~> 1.0"
     }
   }
 }
 
 # Using environment variables (recommended for GitHub Actions)
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   # ARM_TENANT_ID, ARM_CLIENT_ID, ARM_USE_OIDC=true
 }
 
 # Using explicit configuration
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   tenant_id  = var.tenant_id
   client_id  = var.client_id
   oidc_token = var.oidc_token  # For OIDC/Workload Identity
@@ -64,13 +64,13 @@ provider "msgraph_entra" {
 
 ```hcl
 # Data source
-data "msgraph_entra_directory_role" "security_admin" {
+data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
 
 # Resource
-resource "msgraph_entra_directory_role_eligible_assignment" "example" {
-  role_definition_id = data.msgraph_entra_directory_role.security_admin.template_id
+resource "msgraph-entra_directory_role_eligible_assignment" "example" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
   principal_id       = data.azuread_user.john.id
   directory_scope_id = "/"
   justification      = "Security operations"
@@ -106,7 +106,7 @@ steps:
 ## Next Steps
 
 1. Test the provider locally
-2. Publish to Terraform Registry as `yourusername/msgraph_entra`
+2. Publish to Terraform Registry as `yourusername/msgraph-entra`
 3. Update GitHub repository name (optional but recommended)
 4. Tag a release (v1.0.0)
 

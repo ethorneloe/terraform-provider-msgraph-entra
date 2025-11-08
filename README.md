@@ -1,4 +1,4 @@
-# Terraform Provider msgraph_entra (Azure AD)
+# Terraform Provider msgraph-entra (Azure AD)
 
 A Terraform provider for managing Microsoft Entra ID (formerly Azure AD) resources with a focus on Privileged Identity Management (PIM) features.
 
@@ -32,7 +32,7 @@ This provider fills those gaps by providing direct support for Entra ID director
 ```shell
 git clone https://github.com/ethorneloe/terraform-provider-msgraph-entra
 cd terraform-provider-msgraph-entra
-go build -o terraform-provider-msgraph_entra.exe
+go build -o terraform-provider-msgraph-entra.exe
 ```
 
 ## Using the Provider
@@ -44,7 +44,7 @@ The provider supports multiple authentication methods:
 #### Service Principal (Client Credentials)
 
 ```hcl
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   tenant_id     = "00000000-0000-0000-0000-000000000000"
   client_id     = "00000000-0000-0000-0000-000000000000"
   client_secret = var.client_secret
@@ -60,7 +60,7 @@ export ENTRA_CLIENT_SECRET="your-secret-here"
 ```
 
 ```hcl
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   # Configuration read from environment variables
 }
 ```
@@ -68,7 +68,7 @@ provider "msgraph_entra" {
 #### Azure CLI
 
 ```hcl
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   use_cli = true
 }
 ```
@@ -81,7 +81,7 @@ Creates an eligible assignment for an Entra ID directory role. Users must activa
 
 ```hcl
 # Look up the Security Administrator role
-data "msgraph_entra_directory_role" "security_admin" {
+data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
 
@@ -91,7 +91,7 @@ data "azuread_user" "john" {
 }
 
 # Create eligible assignment
-resource "msgraph_entra_directory_role_eligible_assignment" "john_security_admin" {
+resource "msgraph-entra_directory_role_eligible_assignment" "john_security_admin" {
   role_definition_id = data.entra_directory_role.security_admin.template_id
   principal_id       = data.azuread_user.john.id
   directory_scope_id = "/"
@@ -133,7 +133,7 @@ resource "msgraph_entra_directory_role_eligible_assignment" "john_security_admin
 Retrieves information about an Entra ID directory role.
 
 ```hcl
-data "msgraph_entra_directory_role" "global_admin" {
+data "msgraph-entra_directory_role" "global_admin" {
   display_name = "Global Administrator"
 }
 
@@ -175,7 +175,7 @@ locals {
   ]
 }
 
-data "msgraph_entra_directory_role" "security_administrator" {
+data "msgraph-entra_directory_role" "security_administrator" {
   display_name = "Security Administrator"
 }
 
@@ -184,7 +184,7 @@ data "azuread_user" "security_admins" {
   user_principal_name = each.value.upn
 }
 
-resource "msgraph_entra_directory_role_eligible_assignment" "security_admins" {
+resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
   for_each = { for admin in local.security_admins : admin.upn => admin }
 
   role_definition_id = data.entra_directory_role.security_administrator.template_id
@@ -231,7 +231,7 @@ locals {
   ])
 }
 
-data "msgraph_entra_directory_role" "roles" {
+data "msgraph-entra_directory_role" "roles" {
   for_each     = toset(keys(local.role_assignments))
   display_name = each.key
 }
@@ -241,7 +241,7 @@ data "azuread_user" "users" {
   user_principal_name = each.key
 }
 
-resource "msgraph_entra_directory_role_eligible_assignment" "assignments" {
+resource "msgraph-entra_directory_role_eligible_assignment" "assignments" {
   for_each = { for assignment in local.all_assignments : assignment.key => assignment }
 
   role_definition_id = data.entra_directory_role.roles[each.value.role_name].template_id

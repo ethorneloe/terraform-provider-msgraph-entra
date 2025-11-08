@@ -4,8 +4,8 @@
 
 terraform {
   required_providers {
-    msgraph_entra = {
-      source  = "yourusername/msgraph_entra"
+    msgraph-entra = {
+      source  = "yourusername/msgraph-entra"
       version = "~> 1.0"
     }
     azuread = {
@@ -22,7 +22,7 @@ terraform {
 # the OIDC token when ARM_USE_OIDC=true is set in the environment.
 # No client_secret is needed!
 
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   # These values come from GitHub Secrets:
   # - ARM_TENANT_ID = ${{ secrets.AZURE_TENANT_ID }}
   # - ARM_CLIENT_ID = ${{ secrets.AZURE_CLIENT_ID }}
@@ -33,7 +33,7 @@ provider "msgraph_entra" {
 }
 
 # For local development/testing, you can use Azure CLI instead:
-# provider "msgraph_entra" {
+# provider "msgraph-entra" {
 #   use_cli = true
 # }
 
@@ -47,7 +47,7 @@ provider "azuread" {
 # ============================================================================
 
 # Look up the Security Administrator role
-data "msgraph_entra_directory_role" "security_admin" {
+data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
 
@@ -74,10 +74,10 @@ data "azuread_user" "security_admins" {
 }
 
 # Create eligible role assignments using OIDC authentication
-resource "msgraph_entra_directory_role_eligible_assignment" "security_admins" {
+resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
   for_each = { for admin in local.security_admins : admin.upn => admin }
 
-  role_definition_id = data.msgraph_entra_directory_role.security_admin.template_id
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
   principal_id       = data.azuread_user.security_admins[each.key].id
   directory_scope_id = "/"
   justification      = each.value.justification
@@ -96,7 +96,7 @@ resource "msgraph_entra_directory_role_eligible_assignment" "security_admins" {
 # Example: Global Administrator (Break-Glass Accounts)
 # ============================================================================
 
-data "msgraph_entra_directory_role" "global_admin" {
+data "msgraph-entra_directory_role" "global_admin" {
   display_name = "Global Administrator"
 }
 
@@ -120,10 +120,10 @@ data "azuread_user" "global_admins" {
   user_principal_name = each.value.upn
 }
 
-resource "msgraph_entra_directory_role_eligible_assignment" "global_admins" {
+resource "msgraph-entra_directory_role_eligible_assignment" "global_admins" {
   for_each = { for admin in local.global_admins : admin.upn => admin }
 
-  role_definition_id = data.msgraph_entra_directory_role.global_admin.template_id
+  role_definition_id = data.msgraph-entra_directory_role.global_admin.template_id
   principal_id       = data.azuread_user.global_admins[each.key].id
   directory_scope_id = "/"
   justification      = each.value.justification
@@ -145,7 +145,7 @@ resource "msgraph_entra_directory_role_eligible_assignment" "global_admins" {
 output "security_admin_assignments" {
   description = "Security Administrator role assignments created via OIDC"
   value = {
-    for k, v in msgraph_entra_directory_role_eligible_assignment.security_admins :
+    for k, v in msgraph-entra_directory_role_eligible_assignment.security_admins :
     k => {
       id          = v.id
       schedule_id = v.schedule_id
@@ -156,7 +156,7 @@ output "security_admin_assignments" {
 output "global_admin_assignments" {
   description = "Global Administrator role assignments created via OIDC"
   value = {
-    for k, v in msgraph_entra_directory_role_eligible_assignment.global_admins :
+    for k, v in msgraph-entra_directory_role_eligible_assignment.global_admins :
     k => {
       id          = v.id
       schedule_id = v.schedule_id

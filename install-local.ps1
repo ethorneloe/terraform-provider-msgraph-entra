@@ -26,14 +26,14 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Create plugin directory
-$PluginDir = "$env:APPDATA\terraform.d\plugins\registry.terraform.io\$Namespace\msgraph_entra\$Version\${OS}_${ARCH}"
+$PluginDir = "$env:APPDATA\terraform.d\plugins\registry.terraform.io\$Namespace\msgraph-entra\$Version\${OS}_${ARCH}"
 
 Write-Host "Creating plugin directory: $PluginDir" -ForegroundColor Green
 New-Item -ItemType Directory -Force -Path $PluginDir | Out-Null
 
 # Copy the provider binary
 Write-Host "Copying provider binary..." -ForegroundColor Green
-Copy-Item -Path ".\terraform-provider-msgraph-entra.exe" -Destination "$PluginDir\terraform-provider-msgraph_entra_v${Version}.exe" -Force
+Copy-Item -Path ".\terraform-provider-msgraph-entra.exe" -Destination "$PluginDir\terraform-provider-msgraph-entra_v${Version}.exe" -Force
 
 Write-Host "`n✅ Provider installed successfully!" -ForegroundColor Green
 Write-Host "`nYou can now use it in your Terraform configuration:" -ForegroundColor Cyan
@@ -41,14 +41,14 @@ Write-Host @"
 
 terraform {
   required_providers {
-    msgraph_entra = {
-      source  = "$Namespace/msgraph_entra"
+    msgraph-entra = {
+      source  = "$Namespace/msgraph-entra"
       version = "~> $Version"
     }
   }
 }
 
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   # Your configuration
 }
 "@

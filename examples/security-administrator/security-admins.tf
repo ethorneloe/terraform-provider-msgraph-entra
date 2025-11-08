@@ -2,7 +2,7 @@
 # This file manages all eligible assignments for the Security Administrator role
 
 # Data source to look up the Security Administrator role
-data "msgraph_entra_directory_role" "security_administrator" {
+data "msgraph-entra_directory_role" "security_administrator" {
   display_name = "Security Administrator"
 }
 
@@ -37,10 +37,10 @@ data "azuread_user" "security_admins" {
 }
 
 # Create eligible role assignments for each user
-resource "msgraph_entra_directory_role_eligible_assignment" "security_admins" {
+resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
   for_each = { for admin in local.security_admins : admin.upn => admin }
 
-  role_definition_id = data.msgraph_entra_directory_role.security_administrator.template_id
+  role_definition_id = data.msgraph-entra_directory_role.security_administrator.template_id
   principal_id       = data.azuread_user.security_admins[each.key].id
   directory_scope_id = "/"
   justification      = each.value.justification

@@ -18,20 +18,20 @@ func TestAccDirectoryRoleDataSource(t *testing.T) {
 			{
 				Config: testAccDirectoryRoleDataSourceConfig("Security Administrator"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.msgraph_entra_directory_role.test", "display_name", "Security Administrator"),
-					resource.TestCheckResourceAttrSet("data.msgraph_entra_directory_role.test", "id"),
-					resource.TestCheckResourceAttrSet("data.msgraph_entra_directory_role.test", "template_id"),
-					resource.TestCheckResourceAttrSet("data.msgraph_entra_directory_role.test", "description"),
+					resource.TestCheckResourceAttr("data.msgraph-entra_directory_role.test", "display_name", "Security Administrator"),
+					resource.TestCheckResourceAttrSet("data.msgraph-entra_directory_role.test", "id"),
+					resource.TestCheckResourceAttrSet("data.msgraph-entra_directory_role.test", "template_id"),
+					resource.TestCheckResourceAttrSet("data.msgraph-entra_directory_role.test", "description"),
 				),
 			},
 			// Read testing - Global Administrator role
 			{
 				Config: testAccDirectoryRoleDataSourceConfig("Global Administrator"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.msgraph_entra_directory_role.test", "display_name", "Global Administrator"),
-					resource.TestCheckResourceAttrSet("data.msgraph_entra_directory_role.test", "id"),
-					resource.TestCheckResourceAttrSet("data.msgraph_entra_directory_role.test", "template_id"),
-					resource.TestCheckResourceAttrSet("data.msgraph_entra_directory_role.test", "description"),
+					resource.TestCheckResourceAttr("data.msgraph-entra_directory_role.test", "display_name", "Global Administrator"),
+					resource.TestCheckResourceAttrSet("data.msgraph-entra_directory_role.test", "id"),
+					resource.TestCheckResourceAttrSet("data.msgraph-entra_directory_role.test", "template_id"),
+					resource.TestCheckResourceAttrSet("data.msgraph-entra_directory_role.test", "description"),
 				),
 			},
 		},
@@ -40,7 +40,7 @@ func TestAccDirectoryRoleDataSource(t *testing.T) {
 
 func testAccDirectoryRoleDataSourceConfig(displayName string) string {
 	return `
-data "msgraph_entra_directory_role" "test" {
+data "msgraph-entra_directory_role" "test" {
   display_name = "` + displayName + `"
 }
 `

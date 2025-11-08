@@ -1,4 +1,4 @@
-# Quick Start Guide - msgraph_entra Provider
+# Quick Start Guide - msgraph-entra Provider
 
 ## 🚀 Fastest Way to Get Started (Local Development)
 
@@ -30,25 +30,25 @@ Create `main.tf`:
 ```hcl
 terraform {
   required_providers {
-    msgraph_entra = {
-      source = "ethorneloe/msgraph_entra"
+    msgraph-entra = {
+      source = "ethorneloe/msgraph-entra"
     }
   }
 }
 
 # Use Azure CLI for authentication (easiest for testing)
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   use_cli = true
 }
 
 # Look up a directory role
-data "msgraph_entra_directory_role" "security_admin" {
+data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
 
 # Output the role template ID
 output "security_admin_template_id" {
-  value = data.msgraph_entra_directory_role.security_admin.template_id
+  value = data.msgraph-entra_directory_role.security_admin.template_id
 }
 ```
 
@@ -78,7 +78,7 @@ Create `security-admins.tf`:
 
 ```hcl
 # Data source for the role
-data "msgraph_entra_directory_role" "security_admin" {
+data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
 
@@ -88,8 +88,8 @@ data "azuread_user" "john" {
 }
 
 # Create eligible assignment
-resource "msgraph_entra_directory_role_eligible_assignment" "john_security_admin" {
-  role_definition_id = data.msgraph_entra_directory_role.security_admin.template_id
+resource "msgraph-entra_directory_role_eligible_assignment" "john_security_admin" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
   principal_id       = data.azuread_user.john.id
   directory_scope_id = "/"
   justification      = "Security team member - incident response"
@@ -192,7 +192,7 @@ locals {
   ]
 }
 
-data "msgraph_entra_directory_role" "security_admin" {
+data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
 
@@ -201,10 +201,10 @@ data "azuread_user" "security_admins" {
   user_principal_name = each.value
 }
 
-resource "msgraph_entra_directory_role_eligible_assignment" "security_admins" {
+resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
   for_each = toset(local.security_admins)
 
-  role_definition_id = data.msgraph_entra_directory_role.security_admin.template_id
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
   principal_id       = data.azuread_user.security_admins[each.key].id
   directory_scope_id = "/"
   justification      = "Security operations team"
@@ -230,8 +230,8 @@ resource "azuread_group" "security_admins_eligible" {
 }
 
 # Assign the role to the group (eligible)
-resource "msgraph_entra_directory_role_eligible_assignment" "group_assignment" {
-  role_definition_id = data.msgraph_entra_directory_role.security_admin.template_id
+resource "msgraph-entra_directory_role_eligible_assignment" "group_assignment" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
   principal_id       = azuread_group.security_admins_eligible.id
   directory_scope_id = "/"
   justification      = "Security operations team group"

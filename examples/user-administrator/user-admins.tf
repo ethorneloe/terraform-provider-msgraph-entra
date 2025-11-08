@@ -2,7 +2,7 @@
 # This file manages all eligible assignments for the User Administrator role
 
 # Data source to look up the User Administrator role
-data "msgraph_entra_directory_role" "user_administrator" {
+data "msgraph-entra_directory_role" "user_administrator" {
   display_name = "User Administrator"
 }
 
@@ -31,10 +31,10 @@ data "azuread_user" "user_admins" {
 }
 
 # Create eligible role assignments for each user
-resource "msgraph_entra_directory_role_eligible_assignment" "user_admins" {
+resource "msgraph-entra_directory_role_eligible_assignment" "user_admins" {
   for_each = { for admin in local.user_admins : admin.upn => admin }
 
-  role_definition_id = data.msgraph_entra_directory_role.user_administrator.template_id
+  role_definition_id = data.msgraph-entra_directory_role.user_administrator.template_id
   principal_id       = data.azuread_user.user_admins[each.key].id
   directory_scope_id = "/"
   justification      = each.value.justification

@@ -21,7 +21,7 @@ if ($LASTEXITCODE -ne 0) {
 $TerraformRC = @"
 provider_installation {
   dev_overrides {
-    "$Namespace/msgraph_entra" = "$($ProviderPath -replace '\\', '/')"
+    "$Namespace/msgraph-entra" = "$($ProviderPath -replace '\\', '/')"
   }
 
   # For all other providers, install them directly as normal.
@@ -57,14 +57,14 @@ Write-Host @"
 
 terraform {
   required_providers {
-    msgraph_entra = {
-      source  = "$Namespace/msgraph_entra"
+    msgraph-entra = {
+      source  = "$Namespace/msgraph-entra"
       version = "~> 1.0"  # Version is ignored with dev_overrides
     }
   }
 }
 
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   # Your configuration
 }
 "@

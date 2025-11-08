@@ -1,6 +1,6 @@
-# Testing Guide - msgraph_entra Provider
+# Testing Guide - msgraph-entra Provider
 
-This document describes how to run the acceptance tests for the msgraph_entra Terraform provider.
+This document describes how to run the acceptance tests for the msgraph-entra Terraform provider.
 
 ## Overview
 

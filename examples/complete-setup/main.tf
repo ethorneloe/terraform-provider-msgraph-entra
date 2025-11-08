@@ -4,8 +4,8 @@
 
 terraform {
   required_providers {
-    msgraph_entra = {
-      source = "yourusername/msgraph_entra"
+    msgraph-entra = {
+      source = "yourusername/msgraph-entra"
     }
     azuread = {
       source  = "hashicorp/azuread"
@@ -15,7 +15,7 @@ terraform {
 }
 
 # Configure the Entra provider
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   tenant_id     = var.tenant_id
   client_id     = var.client_id
   client_secret = var.client_secret
@@ -118,7 +118,7 @@ locals {
 }
 
 # Look up all directory roles
-data "msgraph_entra_directory_role" "roles" {
+data "msgraph-entra_directory_role" "roles" {
   for_each     = toset(keys(local.role_assignments))
   display_name = each.key
 }
@@ -130,10 +130,10 @@ data "azuread_user" "users" {
 }
 
 # Create all eligible role assignments
-resource "msgraph_entra_directory_role_eligible_assignment" "assignments" {
+resource "msgraph-entra_directory_role_eligible_assignment" "assignments" {
   for_each = { for assignment in local.all_assignments : assignment.key => assignment }
 
-  role_definition_id = data.msgraph_entra_directory_role.roles[each.value.role_name].template_id
+  role_definition_id = data.msgraph-entra_directory_role.roles[each.value.role_name].template_id
   principal_id       = data.azuread_user.users[each.value.upn].id
   directory_scope_id = "/"
   justification      = each.value.justification

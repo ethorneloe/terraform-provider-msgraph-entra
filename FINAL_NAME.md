@@ -1,10 +1,10 @@
-# Final Provider Name: msgraph_entra
+# Final Provider Name: msgraph-entra
 
-The provider has been successfully renamed to **`msgraph_entra`** using underscores (following Terraform conventions).
+The provider has been successfully renamed to **`msgraph-entra`** using underscores (following Terraform conventions).
 
 ## ✅ Final Configuration
 
-**Provider Name:** `msgraph_entra`
+**Provider Name:** `msgraph-entra`
 **Module:** `github.com/ethorneloe/terraform-provider-msgraph-entra`
 **Registry:** `registry.terraform.io/ethorneloe/msgraph-entra`
 **Binary:** `terraform-provider-msgraph-entra.exe` (169MB)
@@ -16,14 +16,14 @@ The provider has been successfully renamed to **`msgraph_entra`** using undersco
 ```hcl
 terraform {
   required_providers {
-    msgraph_entra = {
+    msgraph-entra = {
       source  = "ethorneloe/msgraph-entra"
       version = "~> 1.0"
     }
   }
 }
 
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   # Configuration via environment variables
   # ARM_TENANT_ID, ARM_CLIENT_ID, ARM_USE_OIDC=true
 }
@@ -32,7 +32,7 @@ provider "msgraph_entra" {
 ### Data Source
 
 ```hcl
-data "msgraph_entra_directory_role" "security_admin" {
+data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
 ```
@@ -40,8 +40,8 @@ data "msgraph_entra_directory_role" "security_admin" {
 ### Resource
 
 ```hcl
-resource "msgraph_entra_directory_role_eligible_assignment" "example" {
-  role_definition_id = data.msgraph_entra_directory_role.security_admin.template_id
+resource "msgraph-entra_directory_role_eligible_assignment" "example" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
   principal_id       = data.azuread_user.john.id
   directory_scope_id = "/"
   justification      = "Security operations - incident response"
@@ -97,7 +97,7 @@ jobs:
           ARM_USE_OIDC: true
 ```
 
-## 🎯 Why msgraph_entra?
+## 🎯 Why msgraph-entra?
 
 ✅ **Follows Terraform Conventions** - Underscores, not hyphens
 ✅ **Clear Purpose** - msgraph (API) + entra (product)
@@ -108,10 +108,10 @@ jobs:
 ## 📦 Available Resources
 
 ### Resources
-- `msgraph_entra_directory_role_eligible_assignment` - PIM eligible role assignments
+- `msgraph-entra_directory_role_eligible_assignment` - PIM eligible role assignments
 
 ### Data Sources
-- `msgraph_entra_directory_role` - Directory role lookup
+- `msgraph-entra_directory_role` - Directory role lookup
 
 ## 🚀 Features
 

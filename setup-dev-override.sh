@@ -18,7 +18,7 @@ fi
 # Create .terraformrc content
 TERRAFORMRC_CONTENT="provider_installation {
   dev_overrides {
-    \"$NAMESPACE/msgraph_entra\" = \"$PROVIDER_PATH\"
+    \"$NAMESPACE/msgraph-entra\" = \"$PROVIDER_PATH\"
   }
 
   # For all other providers, install them directly as normal.
@@ -60,14 +60,14 @@ cat <<EOF
 
 terraform {
   required_providers {
-    msgraph_entra = {
-      source  = "$NAMESPACE/msgraph_entra"
+    msgraph-entra = {
+      source  = "$NAMESPACE/msgraph-entra"
       version = "~> 1.0"  # Version is ignored with dev_overrides
     }
   }
 }
 
-provider "msgraph_entra" {
+provider "msgraph-entra" {
   # Your configuration
 }
 EOF
