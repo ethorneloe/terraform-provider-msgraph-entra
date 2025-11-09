@@ -9,11 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	abstractions "github.com/microsoft/kiota-abstractions-go/serialization"
@@ -64,14 +66,18 @@ func (r *DirectoryRoleEligibleAssignmentResource) Metadata(ctx context.Context, 
 func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages an eligible assignment for an Entra ID directory role using Privileged Identity Management (PIM). " +
-			"This resource creates time-bound eligible role assignments that users must activate to use. " +
-			"Updates to justification and schedule_info are performed in-place using the adminUpdate action, " +
-			"avoiding disruption to user access. Changes to role_definition_id, principal_id, or directory_scope_id require replacement.",
+			"\n\n**Conceptual Model:** This resource represents a PIM role eligibility *schedule* (the durable object), not the schedule request (the transient operation). " +
+			"The schedule is uniquely identified by the combination of principal_id, role_definition_id, and directory_scope_id. " +
+			"The resource ID is the schedule ID returned by Microsoft Graph. " +
+			"\n\n**Operations:** Under the hood, this provider uses adminAssign (create), adminUpdate (update), and adminRemove (delete) requests to manage the schedule. " +
+			"These requests are asynchronous operations that converge the schedule to the desired state. " +
+			"\n\n**Import:** If a schedule already exists for a given principal/role/scope combination, you must import it rather than creating a new one. " +
+			"Use: `terraform import msgraph-entra_directory_role_eligible_assignment.example <schedule_id>`",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "The ID of the role eligibility schedule request.",
+				MarkdownDescription: "The ID of the role eligibility schedule (unifiedRoleEligibilitySchedule). This is the durable schedule object, not the transient request ID.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -100,7 +106,7 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 				},
 			},
 			"justification": schema.StringAttribute{
-				MarkdownDescription: "Justification for the role assignment.",
+				MarkdownDescription: "Justification for the role assignment request. This is a write-only field sent with create/update requests but not persisted on the schedule. Imported resources will have this field set to null.",
 				Optional:            true,
 			},
 			"schedule_id": schema.StringAttribute{
@@ -134,6 +140,9 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 								Computed:            true,
 								PlanModifiers: []planmodifier.String{
 									stringplanmodifier.UseStateForUnknown(),
+								},
+								Validators: []validator.String{
+									stringvalidator.OneOf("noExpiration", "afterDateTime", "afterDuration"),
 								},
 							},
 							"end_date_time": schema.StringAttribute{
@@ -264,7 +273,7 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 				expiration.SetEndDateTime(&endDateTime)
 			}
 
-			if !data.ScheduleInfo.Expiration.Duration.IsNull() {
+			if !data.ScheduleInfo.Expiration.Duration.IsNull() && data.ScheduleInfo.Expiration.Duration.ValueString() != "" {
 				// Duration as ISO 8601 format (e.g., "PT8H", "P365D")
 				durationStr := data.ScheduleInfo.Expiration.Duration.ValueString()
 				duration, err := abstractions.ParseISODuration(durationStr)
@@ -293,10 +302,39 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 
 	result, err := r.client.CreateRoleEligibilityScheduleRequest(ctx, request)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Creating Role Eligible Assignment",
-			"Could not create role eligible assignment: "+err.Error(),
-		)
+		// Check if the error indicates a schedule already exists
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "RoleAssignmentExists") {
+			// Try to find the existing schedule to provide helpful import guidance
+			existingSchedule, findErr := r.client.FindRoleEligibilitySchedule(ctx, principalID, roleDefID, dirScopeID)
+			if findErr == nil && existingSchedule != nil && existingSchedule.GetId() != nil {
+				scheduleID := *existingSchedule.GetId()
+				resp.Diagnostics.AddError(
+					"Role Assignment Already Exists",
+					fmt.Sprintf("An eligible role assignment already exists for this principal/role/scope combination.\n\n"+
+						"Schedule ID: %s\n\n"+
+						"To manage this existing assignment with Terraform, import it using:\n"+
+						"  terraform import msgraph-entra_directory_role_eligible_assignment.<name> %s\n\n"+
+						"Or remove the existing assignment in the Azure Portal before creating a new one.",
+						scheduleID, scheduleID),
+				)
+			} else {
+				// Could not find existing schedule, provide generic guidance
+				resp.Diagnostics.AddError(
+					"Role Assignment Already Exists",
+					"An eligible role assignment already exists for this principal/role/scope combination.\n\n"+
+						"To resolve this:\n"+
+						"1. Check the Azure Portal for existing eligible assignments\n"+
+						"2. Import the existing assignment using: terraform import msgraph-entra_directory_role_eligible_assignment.<name> <schedule_id>\n"+
+						"3. Or remove the existing assignment before creating a new one\n\n"+
+						"Original error: "+err.Error(),
+				)
+			}
+		} else {
+			resp.Diagnostics.AddError(
+				"Error Creating Role Eligible Assignment",
+				"Could not create role eligible assignment: "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -312,6 +350,15 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 	retryDelay := 2 * time.Second
 
 	for i := 0; i < maxRetries; i++ {
+		// Check for context cancellation
+		if ctx.Err() != nil {
+			resp.Diagnostics.AddError(
+				"Context Cancelled",
+				fmt.Sprintf("Operation was cancelled: %s", ctx.Err().Error()),
+			)
+			return
+		}
+
 		if i > 0 {
 			tflog.Debug(ctx, "Waiting for schedule to be created", map[string]any{
 				"attempt": i + 1,
@@ -374,10 +421,14 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 
 			if expiration.GetEndDateTime() != nil {
 				data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
+			} else {
+				data.ScheduleInfo.Expiration.EndDateTime = types.StringNull()
 			}
 
 			if expiration.GetDuration() != nil {
 				data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
+			} else {
+				data.ScheduleInfo.Expiration.Duration = types.StringNull()
 			}
 		}
 	}
@@ -500,10 +551,14 @@ func (r *DirectoryRoleEligibleAssignmentResource) Read(ctx context.Context, req 
 
 			if expiration.GetEndDateTime() != nil {
 				data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
+			} else {
+				data.ScheduleInfo.Expiration.EndDateTime = types.StringNull()
 			}
 
 			if expiration.GetDuration() != nil {
 				data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
+			} else {
+				data.ScheduleInfo.Expiration.Duration = types.StringNull()
 			}
 		}
 	}
@@ -559,8 +614,11 @@ func (r *DirectoryRoleEligibleAssignmentResource) Update(ctx context.Context, re
 		scheduleInfo := models.NewRequestSchedule()
 
 		// Start date time
+		// If start_date_time is specified in plan, use it. Otherwise, preserve from state.
+		// We don't default to time.Now() unless neither plan nor state has a value.
 		var startDateTime time.Time
 		if !plan.ScheduleInfo.StartDateTime.IsNull() && plan.ScheduleInfo.StartDateTime.ValueString() != "" {
+			// User explicitly set start_date_time in plan - use it
 			var err error
 			startDateTime, err = time.Parse(time.RFC3339, plan.ScheduleInfo.StartDateTime.ValueString())
 			if err != nil {
@@ -570,7 +628,19 @@ func (r *DirectoryRoleEligibleAssignmentResource) Update(ctx context.Context, re
 				)
 				return
 			}
+		} else if state.ScheduleInfo != nil && !state.ScheduleInfo.StartDateTime.IsNull() && state.ScheduleInfo.StartDateTime.ValueString() != "" {
+			// Preserve start_date_time from state (don't reset to now on update)
+			var err error
+			startDateTime, err = time.Parse(time.RFC3339, state.ScheduleInfo.StartDateTime.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Invalid Start Date Time from State",
+					fmt.Sprintf("Could not parse start_date_time from state: %s", err.Error()),
+				)
+				return
+			}
 		} else {
+			// Neither plan nor state has a value - default to now
 			startDateTime = time.Now().UTC()
 		}
 		scheduleInfo.SetStartDateTime(&startDateTime)
@@ -605,7 +675,7 @@ func (r *DirectoryRoleEligibleAssignmentResource) Update(ctx context.Context, re
 				expiration.SetEndDateTime(&endDateTime)
 			}
 
-			if !plan.ScheduleInfo.Expiration.Duration.IsNull() {
+			if !plan.ScheduleInfo.Expiration.Duration.IsNull() && plan.ScheduleInfo.Expiration.Duration.ValueString() != "" {
 				durationStr := plan.ScheduleInfo.Expiration.Duration.ValueString()
 				duration, err := abstractions.ParseISODuration(durationStr)
 				if err != nil {
@@ -634,13 +704,14 @@ func (r *DirectoryRoleEligibleAssignmentResource) Update(ctx context.Context, re
 		return
 	}
 
-	// Update the request ID (the schedule ID should remain the same)
-	if result.GetId() != nil {
-		plan.ID = types.StringPointerValue(result.GetId())
-	}
+	tflog.Info(ctx, "Role eligibility schedule update request created", map[string]any{
+		"request_id": result.GetId(),
+	})
 
-	// Keep the schedule ID from state (it should be the same)
-	plan.ScheduleID = state.ScheduleID
+	// The result is the request, not the schedule.
+	// We need to wait for the request to be processed and then read the schedule.
+	// IMPORTANT: We don't touch plan.ID or plan.ScheduleID here - they remain as schedule IDs from state.
+	// The request ID is logged above but not stored in state.
 
 	tflog.Trace(ctx, "Updated directory role eligible assignment", map[string]any{
 		"id":          plan.ID.ValueString(),
@@ -696,6 +767,15 @@ func (r *DirectoryRoleEligibleAssignmentResource) Delete(ctx context.Context, re
 	retryDelay := 2 * time.Second
 
 	for i := 0; i < maxRetries; i++ {
+		// Check for context cancellation
+		if ctx.Err() != nil {
+			resp.Diagnostics.AddError(
+				"Context Cancelled",
+				fmt.Sprintf("Operation was cancelled: %s", ctx.Err().Error()),
+			)
+			return
+		}
+
 		if i > 0 {
 			tflog.Debug(ctx, "Checking if schedule is deleted", map[string]any{
 				"attempt": i + 1,

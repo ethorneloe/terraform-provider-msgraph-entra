@@ -47,6 +47,8 @@ func TestAccDirectoryRoleEligibleAssignmentResource_Basic(t *testing.T) {
 				ResourceName:      "msgraph-entra_directory_role_eligible_assignment.test",
 				ImportState:       true,
 				ImportStateVerify: true,
+				// Justification is write-only (not persisted on the schedule, only sent in requests)
+				ImportStateVerifyIgnore: []string{"justification"},
 			},
 			// Update and Read testing - change justification (in-place update)
 			{

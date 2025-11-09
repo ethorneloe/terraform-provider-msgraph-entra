@@ -63,15 +63,14 @@ func testAccPreCheck(t *testing.T) {
 	tenantID := getEnvWithFallback("ENTRA_TENANT_ID", "ARM_TENANT_ID")
 	clientID := getEnvWithFallback("ENTRA_CLIENT_ID", "ARM_CLIENT_ID")
 	clientSecret := getEnvWithFallback("ENTRA_CLIENT_SECRET", "ARM_CLIENT_SECRET")
-	oidcToken := getEnvWithFallback("ENTRA_OIDC_TOKEN", "ARM_OIDC_TOKEN")
 	useOIDC := getEnvWithFallback("ENTRA_USE_OIDC", "ARM_USE_OIDC") == "true"
 
 	if clientID != "" && clientSecret != "" && tenantID != "" {
 		hasClientCreds = true
 	}
 
-	// OIDC is available if we have explicit token OR if ARM_USE_OIDC=true (GitHub Actions)
-	if clientID != "" && tenantID != "" && (oidcToken != "" || useOIDC) {
+	// OIDC is available if ARM_USE_OIDC=true (GitHub Actions)
+	if clientID != "" && tenantID != "" && useOIDC {
 		hasOIDC = true
 	}
 
@@ -107,7 +106,6 @@ func testAccResolvePrincipalID(t *testing.T, principalIdentifier string) string 
 	tenantID := getEnvWithFallback("ENTRA_TENANT_ID", "ARM_TENANT_ID")
 	clientID := getEnvWithFallback("ENTRA_CLIENT_ID", "ARM_CLIENT_ID")
 	clientSecret := getEnvWithFallback("ENTRA_CLIENT_SECRET", "ARM_CLIENT_SECRET")
-	oidcToken := getEnvWithFallback("ENTRA_OIDC_TOKEN", "ARM_OIDC_TOKEN")
 	useOIDC := getEnvWithFallback("ENTRA_USE_OIDC", "ARM_USE_OIDC") == "true"
 
 	var graphClient *GraphClient
