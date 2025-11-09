@@ -395,34 +395,45 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 		}
 
 		if scheduleInfo.GetExpiration() != nil {
-			expiration := scheduleInfo.GetExpiration()
+			exp := scheduleInfo.GetExpiration()
 			if data.ScheduleInfo.Expiration == nil {
 				data.ScheduleInfo.Expiration = &ExpirationModel{}
 			}
 
-			if expiration.GetTypeEscaped() != nil {
-				switch *expiration.GetTypeEscaped() {
-				case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
-					data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
-				case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
-					data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
-				case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
-					data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
+			// Only fill values that were Unknown in the plan. This avoids
+			// clobbering user-specified values (e.g. when Graph converts
+			// afterDuration+duration into afterDateTime+endDateTime).
+			if data.ScheduleInfo.Expiration.Type.IsUnknown() {
+				if exp.GetTypeEscaped() != nil {
+					switch *exp.GetTypeEscaped() {
+					case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
+					case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
+					case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
+					}
+				} else {
+					data.ScheduleInfo.Expiration.Type = types.StringNull()
 				}
-			} else {
-				data.ScheduleInfo.Expiration.Type = types.StringNull()
 			}
 
-			if expiration.GetEndDateTime() != nil {
-				data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
-			} else {
-				data.ScheduleInfo.Expiration.EndDateTime = types.StringNull()
+			if data.ScheduleInfo.Expiration.EndDateTime.IsUnknown() {
+				if exp.GetEndDateTime() != nil {
+					data.ScheduleInfo.Expiration.EndDateTime =
+						types.StringValue(exp.GetEndDateTime().Format(time.RFC3339))
+				} else {
+					data.ScheduleInfo.Expiration.EndDateTime = types.StringNull()
+				}
 			}
 
-			if expiration.GetDuration() != nil {
-				data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
-			} else {
-				data.ScheduleInfo.Expiration.Duration = types.StringNull()
+			if data.ScheduleInfo.Expiration.Duration.IsUnknown() {
+				if exp.GetDuration() != nil {
+					data.ScheduleInfo.Expiration.Duration =
+						types.StringValue(exp.GetDuration().String())
+				} else {
+					data.ScheduleInfo.Expiration.Duration = types.StringNull()
+				}
 			}
 		}
 	}
@@ -530,32 +541,45 @@ func (r *DirectoryRoleEligibleAssignmentResource) Read(ctx context.Context, req 
 		}
 
 		if scheduleInfo.GetExpiration() != nil {
-			expiration := scheduleInfo.GetExpiration()
+			exp := scheduleInfo.GetExpiration()
 			if data.ScheduleInfo.Expiration == nil {
 				data.ScheduleInfo.Expiration = &ExpirationModel{}
 			}
 
-			if expiration.GetTypeEscaped() != nil {
-				switch *expiration.GetTypeEscaped() {
-				case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
-					data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
-				case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
-					data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
-				case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
-					data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
+			// Only populate type from Graph if we don't already have one.
+			// This preserves user's afterDuration choice even when Graph converts it to afterDateTime.
+			if data.ScheduleInfo.Expiration.Type.IsNull() {
+				if exp.GetTypeEscaped() != nil {
+					switch *exp.GetTypeEscaped() {
+					case models.NOEXPIRATION_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("noExpiration")
+					case models.AFTERDATETIME_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDateTime")
+					case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
+						data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
+					}
+				} else {
+					data.ScheduleInfo.Expiration.Type = types.StringNull()
 				}
 			}
 
-			if expiration.GetEndDateTime() != nil {
-				data.ScheduleInfo.Expiration.EndDateTime = types.StringValue(expiration.GetEndDateTime().Format(time.RFC3339))
+			// Always sync end_date_time from Graph; it's a computed output.
+			if exp.GetEndDateTime() != nil {
+				data.ScheduleInfo.Expiration.EndDateTime =
+					types.StringValue(exp.GetEndDateTime().Format(time.RFC3339))
 			} else {
 				data.ScheduleInfo.Expiration.EndDateTime = types.StringNull()
 			}
 
-			if expiration.GetDuration() != nil {
-				data.ScheduleInfo.Expiration.Duration = types.StringValue(expiration.GetDuration().String())
-			} else {
-				data.ScheduleInfo.Expiration.Duration = types.StringNull()
+			// Only populate duration from Graph if we don't already have one.
+			// This preserves user's duration value even when Graph might report null after conversion.
+			if data.ScheduleInfo.Expiration.Duration.IsNull() {
+				if exp.GetDuration() != nil {
+					data.ScheduleInfo.Expiration.Duration =
+						types.StringValue(exp.GetDuration().String())
+				} else {
+					data.ScheduleInfo.Expiration.Duration = types.StringNull()
+				}
 			}
 		}
 	}

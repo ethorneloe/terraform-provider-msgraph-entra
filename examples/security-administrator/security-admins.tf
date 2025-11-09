@@ -7,24 +7,22 @@ data "msgraph-entra_directory_role" "security_administrator" {
 }
 
 # Define the list of users who should have eligible access to Security Administrator role
+# Note: start_date_time is now read-only and set automatically by Microsoft Graph
 locals {
   security_admins = [
     {
       upn           = "john.doe@contoso.com"
       justification = "Security team lead - requires elevated access for incident response"
-      start_date    = "2025-01-08T00:00:00Z"
       end_date      = "2025-12-31T23:59:59Z"
     },
     {
       upn           = "jane.smith@contoso.com"
       justification = "Security analyst - on-call rotation"
-      start_date    = "2025-01-08T00:00:00Z"
       end_date      = "2025-06-30T23:59:59Z"
     },
     {
       upn           = "bob.johnson@contoso.com"
       justification = "SOC manager - operational oversight"
-      start_date    = "2025-01-08T00:00:00Z"
       end_date      = "2026-01-08T00:00:00Z"
     },
   ]
@@ -46,8 +44,6 @@ resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
   justification      = each.value.justification
 
   schedule_info {
-    start_date_time = each.value.start_date
-
     expiration {
       type          = "afterDateTime"
       end_date_time = each.value.end_date

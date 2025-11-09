@@ -327,3 +327,208 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
 		},
 	})
 }
+
+// TestAccDirectoryRoleEligibleAssignmentResource_AfterDuration tests creating an assignment
+// with afterDuration expiration type using ISO 8601 duration format.
+func TestAccDirectoryRoleEligibleAssignmentResource_AfterDuration(t *testing.T) {
+	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
+	if principalIdentifier == "" {
+		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
+	}
+	principalID := testAccResolvePrincipalID(t, principalIdentifier)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDirectoryRoleEligibleAssignmentResourceConfig_afterDuration(principalID, "PT8H"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.type", "afterDuration"),
+					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.duration", "PT8H"),
+					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
+					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "id"),
+					// Verify start_date_time is populated (read-only from Graph)
+					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.start_date_time"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "msgraph-entra_directory_role_eligible_assignment.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// Justification is write-only (not persisted on the schedule, only sent in requests)
+				// For afterDuration, Graph normalizes to afterDateTime and drops duration, so
+				// import cannot reproduce the original type/duration pair exactly.
+				ImportStateVerifyIgnore: []string{
+					"justification",
+					"schedule_info.expiration.type",
+					"schedule_info.expiration.duration",
+				},
+			},
+		},
+	})
+}
+
+// TestAccDirectoryRoleEligibleAssignmentResource_UpdateDuration tests updating the duration
+// in-place without creating a new schedule (verifies adminUpdate functionality).
+func TestAccDirectoryRoleEligibleAssignmentResource_UpdateDuration(t *testing.T) {
+	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
+	if principalIdentifier == "" {
+		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
+	}
+	principalID := testAccResolvePrincipalID(t, principalIdentifier)
+
+	var scheduleID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create with initial duration
+			{
+				Config: testAccDirectoryRoleEligibleAssignmentResourceConfig_afterDuration(principalID, "PT8H"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.duration", "PT8H"),
+					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["msgraph-entra_directory_role_eligible_assignment.test"]
+						if !ok {
+							return fmt.Errorf("resource not found in state")
+						}
+						scheduleID = rs.Primary.Attributes["schedule_id"]
+						if scheduleID == "" {
+							return fmt.Errorf("schedule_id is empty in state")
+						}
+						return nil
+					},
+				),
+			},
+			// Update duration (in-place update - this is the key test for adminUpdate functionality)
+			{
+				Config: testAccDirectoryRoleEligibleAssignmentResourceConfig_afterDuration(principalID, "PT24H"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.duration", "PT24H"),
+					// The schedule_id should remain the same - proving it's an in-place update
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["msgraph-entra_directory_role_eligible_assignment.test"]
+						if !ok {
+							return fmt.Errorf("resource not found in state")
+						}
+						got := rs.Primary.Attributes["schedule_id"]
+						if got != scheduleID {
+							return fmt.Errorf("schedule_id changed across update: %s -> %s", scheduleID, got)
+						}
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+// TestAccDirectoryRoleEligibleAssignmentResource_InvalidEndDateTime tests that the
+// provider or Graph rejects malformed RFC3339 end_date_time values.
+func TestAccDirectoryRoleEligibleAssignmentResource_InvalidEndDateTime(t *testing.T) {
+	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
+	if principalIdentifier == "" {
+		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
+	}
+	principalID := testAccResolvePrincipalID(t, principalIdentifier)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+provider "msgraph-entra" {}
+
+data "msgraph-entra_directory_role" "security_admin" {
+  display_name = "Security Administrator"
+}
+
+resource "msgraph-entra_directory_role_eligible_assignment" "test" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
+  principal_id       = %q
+  directory_scope_id = "/"
+
+  schedule_info {
+    expiration {
+      type          = "afterDateTime"
+      end_date_time = "not-a-valid-rfc3339-date"
+    }
+  }
+}
+`, principalID),
+				// Should fail validation or Graph API call
+				ExpectError: regexp.MustCompile(`invalid|parse|format`),
+			},
+		},
+	})
+}
+
+// TestAccDirectoryRoleEligibleAssignmentResource_InvalidDuration tests that the
+// provider or Graph rejects malformed ISO 8601 duration values.
+func TestAccDirectoryRoleEligibleAssignmentResource_InvalidDuration(t *testing.T) {
+	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
+	if principalIdentifier == "" {
+		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
+	}
+	principalID := testAccResolvePrincipalID(t, principalIdentifier)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+provider "msgraph-entra" {}
+
+data "msgraph-entra_directory_role" "security_admin" {
+  display_name = "Security Administrator"
+}
+
+resource "msgraph-entra_directory_role_eligible_assignment" "test" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
+  principal_id       = %q
+  directory_scope_id = "/"
+
+  schedule_info {
+    expiration {
+      type     = "afterDuration"
+      duration = "not-a-valid-iso8601-duration"
+    }
+  }
+}
+`, principalID),
+				// Should fail validation or Graph API call
+				ExpectError: regexp.MustCompile(`invalid|parse|format`),
+			},
+		},
+	})
+}
+
+func testAccDirectoryRoleEligibleAssignmentResourceConfig_afterDuration(principalID, duration string) string {
+	return fmt.Sprintf(`
+provider "msgraph-entra" {}
+
+data "msgraph-entra_directory_role" "security_admin" {
+  display_name = "Security Administrator"
+}
+
+resource "msgraph-entra_directory_role_eligible_assignment" "test" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
+  principal_id       = %[1]q
+  directory_scope_id = "/"
+  justification      = "Test afterDuration assignment"
+
+  schedule_info {
+    expiration {
+      type     = "afterDuration"
+      duration = %[2]q
+    }
+  }
+}
+`, principalID, duration)
+}
