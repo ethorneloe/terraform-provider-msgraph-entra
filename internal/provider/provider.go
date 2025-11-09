@@ -225,6 +225,7 @@ func (p *EntraProvider) EphemeralResources(ctx context.Context) []func() ephemer
 func (p *EntraProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewDirectoryRoleDataSource,
+		NewUserDataSource,
 	}
 }
 
