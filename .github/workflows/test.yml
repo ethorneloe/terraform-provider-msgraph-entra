@@ -66,6 +66,9 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      # Force sequential execution to avoid race conditions with PIM role assignments
+      # Multiple parallel tests would try to create/modify the same assignments
+      max-parallel: 1
       matrix:
         # list whatever Terraform versions here you would like to support
         terraform:
