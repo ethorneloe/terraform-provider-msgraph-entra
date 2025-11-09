@@ -210,58 +210,9 @@ func testAccCheckDirectoryRoleEligibleAssignmentExists(resourceName string) reso
 	}
 }
 
-// TestAccDirectoryRoleEligibleAssignmentResource_AddScheduleInfo tests adding schedule_info
-// to an assignment that was initially created without it. This exercises the nil guard
-// for state.ScheduleInfo in the Update function.
-func TestAccDirectoryRoleEligibleAssignmentResource_AddScheduleInfo(t *testing.T) {
-	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
-	if principalIdentifier == "" {
-		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
-	}
-	principalID := testAccResolvePrincipalID(t, principalIdentifier)
-
-	endTime := time.Now().UTC().Add(90 * 24 * time.Hour).Format(time.RFC3339)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			// Step 1: create with no schedule_info at all
-			{
-				Config: fmt.Sprintf(`
-provider "msgraph-entra" {}
-
-data "msgraph-entra_directory_role" "security_admin" {
-  display_name = "Security Administrator"
-}
-
-resource "msgraph-entra_directory_role_eligible_assignment" "test" {
-  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
-  principal_id       = %q
-  directory_scope_id = "/"
-  justification      = "Initial without schedule_info"
-}
-`, principalID),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "principal_id", principalID),
-					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
-				),
-			},
-			// Step 2: add schedule_info/expiration block
-			{
-				Config: testAccDirectoryRoleEligibleAssignmentResourceConfig_basic(principalID, endTime),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("msgraph-entra_directory_role_eligible_assignment.test", "schedule_info.expiration.end_date_time", endTime),
-					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
-				),
-			},
-		},
-	})
-}
-
-// TestAccDirectoryRoleEligibleAssignmentResource_AfterDuration tests creating an assignment
-// with afterDuration expiration type. Note: Azure may convert this to afterDateTime.
-func TestAccDirectoryRoleEligibleAssignmentResource_AfterDuration(t *testing.T) {
+// TestAccDirectoryRoleEligibleAssignmentResource_MissingScheduleInfo tests that Graph rejects
+// creating an assignment without schedule_info, validating that schedule_info is required.
+func TestAccDirectoryRoleEligibleAssignmentResource_MissingScheduleInfo(t *testing.T) {
 	principalIdentifier := os.Getenv("TEST_PRINCIPAL_ID")
 	if principalIdentifier == "" {
 		t.Skip("TEST_PRINCIPAL_ID environment variable must be set for acceptance tests")
@@ -284,36 +235,16 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
   role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
   principal_id       = %q
   directory_scope_id = "/"
-
-  schedule_info {
-    expiration {
-      type     = "afterDuration"
-      duration = "PT8H"
-    }
-  }
+  justification      = "Test without schedule_info"
 }
 `, principalID),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Graph may convert afterDuration -> afterDateTime,
-					// but we can at least assert type is one of the allowed values
-					resource.TestCheckResourceAttrWith(
-						"msgraph-entra_directory_role_eligible_assignment.test",
-						"schedule_info.expiration.type",
-						func(v string) error {
-							switch v {
-							case "afterDuration", "afterDateTime":
-								return nil
-							default:
-								return fmt.Errorf("unexpected expiration.type: %q", v)
-							}
-						},
-					),
-					resource.TestCheckResourceAttrSet("msgraph-entra_directory_role_eligible_assignment.test", "schedule_id"),
-				),
+				// Graph requires schedule_info on role eligibility assignments
+				ExpectError: regexp.MustCompile(`role assignment request schedule is invalid`),
 			},
 		},
 	})
 }
+
 
 // TestAccDirectoryRoleEligibleAssignmentResource_NoExpiration tests creating an assignment
 // with noExpiration type.
@@ -390,8 +321,8 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
   }
 }
 `, principalID),
-				// The exact regex depends on the framework's error text; adjust as needed.
-				ExpectError: regexp.MustCompile(`expected value to be one of`),
+				// Validator should reject invalid expiration type values
+				ExpectError: regexp.MustCompile(`value must be one of`),
 			},
 		},
 	})

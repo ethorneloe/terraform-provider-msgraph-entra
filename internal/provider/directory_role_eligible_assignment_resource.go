@@ -122,10 +122,11 @@ func (r *DirectoryRoleEligibleAssignmentResource) Schema(ctx context.Context, re
 				MarkdownDescription: "The schedule of the role eligibility.",
 				Attributes: map[string]schema.Attribute{
 					"start_date_time": schema.StringAttribute{
-						MarkdownDescription: "When the eligibility starts. Must be in RFC3339 format (e.g., '2025-01-08T00:00:00Z'). Defaults to now. Note: Azure may adjust this value slightly.",
-						Optional:            true,
-						Computed:            true,
+						MarkdownDescription: "The actual time the eligibility started, in RFC3339 format (e.g., '2025-01-08T00:00:00Z'). " +
+							"This value is set by Microsoft Graph when the schedule is created and is read-only.",
+						Computed: true,
 						PlanModifiers: []planmodifier.String{
+							// Keep state value once known to avoid perpetual diffs
 							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
@@ -226,22 +227,9 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 	if data.ScheduleInfo != nil {
 		scheduleInfo := models.NewRequestSchedule()
 
-		// Start date time
-		var startDateTime time.Time
-		if !data.ScheduleInfo.StartDateTime.IsNull() && data.ScheduleInfo.StartDateTime.ValueString() != "" {
-			var err error
-			startDateTime, err = time.Parse(time.RFC3339, data.ScheduleInfo.StartDateTime.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Invalid Start Date Time",
-					fmt.Sprintf("Could not parse start_date_time: %s", err.Error()),
-				)
-				return
-			}
-		} else {
-			startDateTime = time.Now().UTC()
-		}
-		scheduleInfo.SetStartDateTime(&startDateTime)
+		// We intentionally do NOT set StartDateTime on the request.
+		// Graph will default it to the time the schedule is created.
+		// We'll read the actual value back into state after creation.
 
 		// Expiration
 		if data.ScheduleInfo.Expiration != nil {
@@ -383,7 +371,7 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 		return
 	}
 
-	// Successfully found the schedule - populate all fields from the actual schedule
+	// Successfully found the schedule - set the resource ID and schedule ID
 	// Use the schedule ID as the resource ID (not the request ID)
 	if schedule.GetId() != nil {
 		scheduleID := types.StringPointerValue(schedule.GetId())
@@ -391,15 +379,19 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 		data.ScheduleID = scheduleID
 	}
 
-	// Update schedule info from the actual schedule
+	// Populate schedule_info from the created schedule so all Computed fields are known
+	// This prevents "unknown values after apply" errors and ensures state matches Graph's canonical values
 	if schedule.GetScheduleInfo() != nil {
 		scheduleInfo := schedule.GetScheduleInfo()
 		if data.ScheduleInfo == nil {
 			data.ScheduleInfo = &ScheduleInfoModel{}
 		}
 
+		// Read actual start time from Graph (computed-only, read-only attribute)
 		if scheduleInfo.GetStartDateTime() != nil {
 			data.ScheduleInfo.StartDateTime = types.StringValue(scheduleInfo.GetStartDateTime().Format(time.RFC3339))
+		} else {
+			data.ScheduleInfo.StartDateTime = types.StringNull()
 		}
 
 		if scheduleInfo.GetExpiration() != nil {
@@ -417,6 +409,8 @@ func (r *DirectoryRoleEligibleAssignmentResource) Create(ctx context.Context, re
 				case models.AFTERDURATION_EXPIRATIONPATTERNTYPE:
 					data.ScheduleInfo.Expiration.Type = types.StringValue("afterDuration")
 				}
+			} else {
+				data.ScheduleInfo.Expiration.Type = types.StringNull()
 			}
 
 			if expiration.GetEndDateTime() != nil {
@@ -528,8 +522,11 @@ func (r *DirectoryRoleEligibleAssignmentResource) Read(ctx context.Context, req 
 			data.ScheduleInfo = &ScheduleInfoModel{}
 		}
 
+		// Read actual start time from Graph (computed-only, read-only attribute)
 		if scheduleInfo.GetStartDateTime() != nil {
 			data.ScheduleInfo.StartDateTime = types.StringValue(scheduleInfo.GetStartDateTime().Format(time.RFC3339))
+		} else {
+			data.ScheduleInfo.StartDateTime = types.StringNull()
 		}
 
 		if scheduleInfo.GetExpiration() != nil {
@@ -610,87 +607,52 @@ func (r *DirectoryRoleEligibleAssignmentResource) Update(ctx context.Context, re
 	}
 
 	// Set updated schedule info
-	if plan.ScheduleInfo != nil {
+	// We only update expiration settings - start_date_time is effectively immutable once created
+	// and we don't support changing it (aligns with "start as soon as deployed" model)
+	if plan.ScheduleInfo != nil && plan.ScheduleInfo.Expiration != nil {
 		scheduleInfo := models.NewRequestSchedule()
+		expiration := models.NewExpirationPattern()
 
-		// Start date time
-		// If start_date_time is specified in plan, use it. Otherwise, preserve from state.
-		// We don't default to time.Now() unless neither plan nor state has a value.
-		var startDateTime time.Time
-		if !plan.ScheduleInfo.StartDateTime.IsNull() && plan.ScheduleInfo.StartDateTime.ValueString() != "" {
-			// User explicitly set start_date_time in plan - use it
-			var err error
-			startDateTime, err = time.Parse(time.RFC3339, plan.ScheduleInfo.StartDateTime.ValueString())
+		if !plan.ScheduleInfo.Expiration.Type.IsNull() {
+			expTypeStr := plan.ScheduleInfo.Expiration.Type.ValueString()
+			var expType models.ExpirationPatternType
+			switch expTypeStr {
+			case "noExpiration":
+				expType = models.NOEXPIRATION_EXPIRATIONPATTERNTYPE
+			case "afterDateTime":
+				expType = models.AFTERDATETIME_EXPIRATIONPATTERNTYPE
+			case "afterDuration":
+				expType = models.AFTERDURATION_EXPIRATIONPATTERNTYPE
+			}
+			expiration.SetTypeEscaped(&expType)
+		}
+
+		if !plan.ScheduleInfo.Expiration.EndDateTime.IsNull() && plan.ScheduleInfo.Expiration.EndDateTime.ValueString() != "" {
+			endDateTime, err := time.Parse(time.RFC3339, plan.ScheduleInfo.Expiration.EndDateTime.ValueString())
 			if err != nil {
 				resp.Diagnostics.AddError(
-					"Invalid Start Date Time",
-					fmt.Sprintf("Could not parse start_date_time: %s", err.Error()),
+					"Invalid End Date Time",
+					fmt.Sprintf("Could not parse end_date_time: %s", err.Error()),
 				)
 				return
 			}
-		} else if state.ScheduleInfo != nil && !state.ScheduleInfo.StartDateTime.IsNull() && state.ScheduleInfo.StartDateTime.ValueString() != "" {
-			// Preserve start_date_time from state (don't reset to now on update)
-			var err error
-			startDateTime, err = time.Parse(time.RFC3339, state.ScheduleInfo.StartDateTime.ValueString())
+			expiration.SetEndDateTime(&endDateTime)
+		}
+
+		if !plan.ScheduleInfo.Expiration.Duration.IsNull() && plan.ScheduleInfo.Expiration.Duration.ValueString() != "" {
+			durationStr := plan.ScheduleInfo.Expiration.Duration.ValueString()
+			duration, err := abstractions.ParseISODuration(durationStr)
 			if err != nil {
 				resp.Diagnostics.AddError(
-					"Invalid Start Date Time from State",
-					fmt.Sprintf("Could not parse start_date_time from state: %s", err.Error()),
+					"Invalid Duration",
+					fmt.Sprintf("Could not parse duration '%s': %s", durationStr, err.Error()),
 				)
 				return
 			}
-		} else {
-			// Neither plan nor state has a value - default to now
-			startDateTime = time.Now().UTC()
-		}
-		scheduleInfo.SetStartDateTime(&startDateTime)
-
-		// Expiration
-		if plan.ScheduleInfo.Expiration != nil {
-			expiration := models.NewExpirationPattern()
-
-			if !plan.ScheduleInfo.Expiration.Type.IsNull() {
-				expTypeStr := plan.ScheduleInfo.Expiration.Type.ValueString()
-				var expType models.ExpirationPatternType
-				switch expTypeStr {
-				case "noExpiration":
-					expType = models.NOEXPIRATION_EXPIRATIONPATTERNTYPE
-				case "afterDateTime":
-					expType = models.AFTERDATETIME_EXPIRATIONPATTERNTYPE
-				case "afterDuration":
-					expType = models.AFTERDURATION_EXPIRATIONPATTERNTYPE
-				}
-				expiration.SetTypeEscaped(&expType)
-			}
-
-			if !plan.ScheduleInfo.Expiration.EndDateTime.IsNull() && plan.ScheduleInfo.Expiration.EndDateTime.ValueString() != "" {
-				endDateTime, err := time.Parse(time.RFC3339, plan.ScheduleInfo.Expiration.EndDateTime.ValueString())
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Invalid End Date Time",
-						fmt.Sprintf("Could not parse end_date_time: %s", err.Error()),
-					)
-					return
-				}
-				expiration.SetEndDateTime(&endDateTime)
-			}
-
-			if !plan.ScheduleInfo.Expiration.Duration.IsNull() && plan.ScheduleInfo.Expiration.Duration.ValueString() != "" {
-				durationStr := plan.ScheduleInfo.Expiration.Duration.ValueString()
-				duration, err := abstractions.ParseISODuration(durationStr)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Invalid Duration",
-						fmt.Sprintf("Could not parse duration '%s': %s", durationStr, err.Error()),
-					)
-					return
-				}
-				expiration.SetDuration(duration)
-			}
-
-			scheduleInfo.SetExpiration(expiration)
+			expiration.SetDuration(duration)
 		}
 
+		scheduleInfo.SetExpiration(expiration)
 		request.SetScheduleInfo(scheduleInfo)
 	}
 
