@@ -245,7 +245,6 @@ resource "msgraph-entra_directory_role_eligible_assignment" "test" {
 	})
 }
 
-
 // TestAccDirectoryRoleEligibleAssignmentResource_NoExpiration tests creating an assignment
 // with noExpiration type.
 func TestAccDirectoryRoleEligibleAssignmentResource_NoExpiration(t *testing.T) {
