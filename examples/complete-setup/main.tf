@@ -5,24 +5,13 @@
 terraform {
   required_providers {
     msgraph-entra = {
-      source = "yourusername/msgraph-entra"
-    }
-    azuread = {
-      source  = "hashicorp/azuread"
-      version = "~> 3.0"
+      source = "registry.terraform.io/ethorneloe/msgraph-entra"
     }
   }
 }
 
 # Configure the Entra provider
 provider "msgraph-entra" {
-  tenant_id     = var.tenant_id
-  client_id     = var.client_id
-  client_secret = var.client_secret
-}
-
-# Configure AzureAD provider (for user lookups)
-provider "azuread" {
   tenant_id     = var.tenant_id
   client_id     = var.client_id
   client_secret = var.client_secret
@@ -47,37 +36,26 @@ variable "client_secret" {
 
 # Central configuration for all role assignments
 # This approach makes it easy to see all assignments at a glance
+# Note: High-privilege roles like Global Administrator and Privileged Role Administrator
+# are intentionally excluded and should be managed manually
 locals {
   # Define all role assignments in a structured format
   role_assignments = {
-    "Global Administrator" = [
-      {
-        upn           = "breakglass1@contoso.com"
-        justification = "Break-glass emergency access"
-        duration      = "P365D"
-      },
-      {
-        upn           = "breakglass2@contoso.com"
-        justification = "Break-glass emergency access"
-        duration      = "P365D"
-      },
-    ]
-
     "Security Administrator" = [
       {
         upn           = "security.lead@contoso.com"
         justification = "Security operations lead"
-        duration      = "P365D"
+        end_date      = "2025-12-31T23:59:59Z"
       },
       {
         upn           = "security.analyst1@contoso.com"
         justification = "SOC analyst - on-call rotation"
-        duration      = "P180D"
+        end_date      = "2025-06-30T23:59:59Z"
       },
       {
         upn           = "security.analyst2@contoso.com"
         justification = "SOC analyst - on-call rotation"
-        duration      = "P180D"
+        end_date      = "2025-06-30T23:59:59Z"
       },
     ]
 
@@ -85,20 +63,12 @@ locals {
       {
         upn           = "helpdesk.lead@contoso.com"
         justification = "Help desk user management"
-        duration      = "P180D"
+        end_date      = "2025-12-31T23:59:59Z"
       },
       {
         upn           = "hr.admin@contoso.com"
         justification = "HR onboarding/offboarding"
-        duration      = "P365D"
-      },
-    ]
-
-    "Privileged Role Administrator" = [
-      {
-        upn           = "identity.admin@contoso.com"
-        justification = "Identity and access management"
-        duration      = "P365D"
+        end_date      = "2025-12-31T23:59:59Z"
       },
     ]
   }
@@ -111,7 +81,7 @@ locals {
         role_name     = role_name
         upn           = assignment.upn
         justification = assignment.justification
-        duration      = assignment.duration
+        end_date      = assignment.end_date
       }
     ]
   ])
@@ -124,7 +94,7 @@ data "msgraph-entra_directory_role" "roles" {
 }
 
 # Look up all users
-data "azuread_user" "users" {
+data "msgraph-entra_user" "users" {
   for_each            = toset([for assignment in local.all_assignments : assignment.upn])
   user_principal_name = each.key
 }
@@ -134,16 +104,14 @@ resource "msgraph-entra_directory_role_eligible_assignment" "assignments" {
   for_each = { for assignment in local.all_assignments : assignment.key => assignment }
 
   role_definition_id = data.msgraph-entra_directory_role.roles[each.value.role_name].template_id
-  principal_id       = data.azuread_user.users[each.value.upn].id
+  principal_id       = data.msgraph-entra_user.users[each.value.upn].id
   directory_scope_id = "/"
   justification      = each.value.justification
 
   schedule_info {
-    start_date_time = "2025-01-08T00:00:00Z"
-
     expiration {
-      type     = "afterDuration"
-      duration = each.value.duration
+      type     = "afterDateTime"
+      end_date = each.value.end_date
     }
   }
 }
