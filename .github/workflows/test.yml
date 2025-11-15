@@ -5,11 +5,19 @@ name: Tests
 # Optionally, you can turn it on using a schedule for regular testing.
 on:
   pull_request:
-    paths-ignore:
-      - 'README.md'
+    paths:
+      - 'internal/provider/**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'main.go'
+      - '.github/workflows/test.yml'
   push:
-    paths-ignore:
-      - 'README.md'
+    paths:
+      - 'internal/provider/**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'main.go'
+      - '.github/workflows/test.yml'
 
 # Testing only needs permissions to read the repository contents.
 permissions:
