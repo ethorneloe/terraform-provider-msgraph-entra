@@ -194,16 +194,27 @@ func (c *GraphClient) GetRoleManagementDirectory() *rolemanagement.DirectoryRequ
 	return c.client.RoleManagement().Directory()
 }
 
-// GetUserByUserPrincipalName retrieves a user's object ID by their UPN (email address).
-// This is useful for converting user-friendly UPNs to object IDs required by the Graph API.
-func (c *GraphClient) GetUserByUserPrincipalName(ctx context.Context, upn string) (string, error) {
-	user, err := c.client.Users().ByUserId(upn).Get(ctx, nil)
+// GetUser retrieves a user by their UPN (user principal name) or object ID.
+// Returns the full user object from Microsoft Graph.
+func (c *GraphClient) GetUser(ctx context.Context, userIdentifier string) (models.Userable, error) {
+	user, err := c.client.Users().ByUserId(userIdentifier).Get(ctx, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to get user by UPN %s: %w", upn, err)
+		return nil, fmt.Errorf("failed to get user %s: %w", userIdentifier, err)
 	}
 
 	if user.GetId() == nil {
-		return "", fmt.Errorf("user %s has no object ID", upn)
+		return nil, fmt.Errorf("user %s has no object ID", userIdentifier)
+	}
+
+	return user, nil
+}
+
+// GetUserByUserPrincipalName retrieves a user's object ID by their UPN (email address).
+// This is useful for converting user-friendly UPNs to object IDs required by the Graph API.
+func (c *GraphClient) GetUserByUserPrincipalName(ctx context.Context, upn string) (string, error) {
+	user, err := c.GetUser(ctx, upn)
+	if err != nil {
+		return "", err
 	}
 
 	return *user.GetId(), nil

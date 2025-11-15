@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # Cleanup script to remove existing test role assignments
 # Run this before running acceptance tests if you get "assignment already exists" errors
 

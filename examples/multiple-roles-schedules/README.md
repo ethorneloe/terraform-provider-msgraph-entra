@@ -4,11 +4,12 @@ This example demonstrates managing eligible role assignments across multiple dir
 
 ## Overview
 
-This configuration manages three types of directory roles with different access patterns:
+This configuration manages two types of directory roles with different access patterns:
 
 1. **Security Administrator** - Annual/periodic reviews with fixed end dates
-2. **Global Administrator** - Tight control with duration-based expiration
-3. **User Administrator** - Permanent access for operational teams
+2. **User Administrator** - Permanent access for operational teams
+
+**Note:** High-privilege roles like Global Administrator and Privileged Role Administrator are intentionally excluded from this example, as they should be managed manually for security best practices.
 
 ## Expiration Strategies
 
@@ -122,16 +123,18 @@ expiration {
 
 ## Usage
 
-1. Update the `locals` blocks with your actual users:
+1. Update the `locals` blocks with your users' UPNs (email addresses):
    ```hcl
    security_admins = [
      {
-       upn           = "your-user@yourdomain.com"
-       justification = "Your justification"
+       upn           = "john.doe@contoso.com"
+       justification = "Security team lead - annual review cycle"
        end_date      = "2025-12-31T23:59:59Z"
      },
    ]
    ```
+
+   No need to manually look up object IDs! The provider will automatically look up users by their UPN using the `msgraph-entra_user` data source.
 
 2. Apply the configuration:
    ```bash
@@ -149,6 +152,7 @@ expiration {
 ## Key Features Demonstrated
 
 - **Multiple expiration types** in a single configuration
+- **Native UPN lookups** - Users specified by email address, not object IDs
 - **Data source lookups** for roles and users
 - **for_each loops** for managing multiple assignments efficiently
 - **Structured outputs** for monitoring and reporting
@@ -160,13 +164,13 @@ Note that `schedule_info.start_date_time` is read-only and set by Microsoft Grap
 
 ## Import Support
 
-Existing assignments can be imported using their schedule ID:
+Existing assignments can be imported using their schedule ID. Note that the import key should use the UPN, not an index:
 
 ```bash
-terraform import msgraph-entra_directory_role_eligible_assignment.security_admins[\"user@domain.com\"] <schedule-id>
+terraform import 'msgraph-entra_directory_role_eligible_assignment.security_admins["security.lead@contoso.com"]' <schedule-id>
 ```
 
-**Note:** When importing assignments created with `afterDuration`, they will show as `afterDateTime` in the imported state (as this is how Graph stores them). To align with your config, simply run `terraform apply` to update the assignment in-place.
+**Note:** When importing assignments created with `afterDuration`, they will show as `afterDateTime` in the imported state (as this is how Graph stores them). The `type` and `duration` fields will be ignored during import verification. To align with your config, simply run `terraform apply` to update the assignment in-place.
 
 ## Outputs
 
