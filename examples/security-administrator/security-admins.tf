@@ -7,7 +7,6 @@ data "msgraph-entra_directory_role" "security_administrator" {
 }
 
 # Define the list of users who should have eligible access to Security Administrator role
-# Note: start_date_time is now read-only and set automatically by Microsoft Graph
 locals {
   security_admins = [
     {
@@ -28,8 +27,8 @@ locals {
   ]
 }
 
-# Look up each user by UPN
-data "azuread_user" "security_admins" {
+# Look up each user by UPN using the native msgraph-entra_user data source
+data "msgraph-entra_user" "security_admins" {
   for_each            = { for admin in local.security_admins : admin.upn => admin }
   user_principal_name = each.value.upn
 }
@@ -39,7 +38,7 @@ resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
   for_each = { for admin in local.security_admins : admin.upn => admin }
 
   role_definition_id = data.msgraph-entra_directory_role.security_administrator.template_id
-  principal_id       = data.azuread_user.security_admins[each.key].id
+  principal_id       = data.msgraph-entra_user.security_admins[each.key].id
   directory_scope_id = "/"
   justification      = each.value.justification
 
@@ -54,7 +53,7 @@ resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
 # Output the created assignments for verification
 output "security_admin_assignments" {
   value = {
-    for k, v in entra_directory_role_eligible_assignment.security_admins :
+    for k, v in msgraph-entra_directory_role_eligible_assignment.security_admins :
     k => {
       id          = v.id
       schedule_id = v.schedule_id

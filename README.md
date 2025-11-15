@@ -1,22 +1,15 @@
-# Terraform Provider msgraph-entra (Azure AD)
+# Terraform Provider msgraph-entra
 
-A Terraform provider for managing Microsoft Entra ID (formerly Azure AD) resources with a focus on Privileged Identity Management (PIM) features.
+A Terraform provider for managing Microsoft Entra ID (formerly Azure AD) resources with a current focus on Privileged Identity Management (PIM) features.
 
 ## Features
 
 - **Eligible Role Assignments**: Create time-bound eligible assignments for Entra ID directory roles using PIM
-- **Flexible Authentication**: Support for service principal (client credentials), Azure CLI authentication
 - **Scalable Management**: Design patterns for managing role assignments at scale across multiple roles
 
-## Why This Provider?
+## Purpose
 
-The existing Terraform providers have gaps when it comes to PIM management:
-
-- **hashicorp/azuread**: Doesn't support PIM eligible role assignments for Entra ID directory roles
-- **hashicorp/azurerm**: Only supports Azure RBAC roles (subscription/resource-level), not Entra ID directory roles
-- **microsoft/msgraph**: Still in preview with limited PIM support
-
-This provider fills those gaps by providing direct support for Entra ID directory role eligible assignments through the Microsoft Graph API.
+To see what it was like to write a provider and how much effort was needed to implement time-bound eligible assignments with Terraform in this fashion as opposed to making use of local-exec and inline scripts.
 
 ## Requirements
 
@@ -75,7 +68,7 @@ provider "msgraph-entra" {
 
 ### Resources
 
-#### `entra_directory_role_eligible_assignment`
+#### `msgraph-entra_directory_role_eligible_assignment`
 
 Creates an eligible assignment for an Entra ID directory role. Users must activate this assignment through PIM to use the role.
 
@@ -85,24 +78,49 @@ data "msgraph-entra_directory_role" "security_admin" {
   display_name = "Security Administrator"
 }
 
-# Look up the user
-data "azuread_user" "john" {
+# Look up users by their UPN
+data "msgraph-entra_user" "john" {
   user_principal_name = "john.doe@contoso.com"
 }
 
-# Create eligible assignment
+data "msgraph-entra_user" "jane" {
+  user_principal_name = "jane.smith@contoso.com"
+}
+
+# Create eligible assignment with fixed expiration date using UPN lookup
+# Using afterDateTime provides strict enforcement - if someone manually changes
+# the end date in the Azure Portal, Terraform will detect drift and revert it
+# on the next apply to match your configured end_date_time.
 resource "msgraph-entra_directory_role_eligible_assignment" "john_security_admin" {
-  role_definition_id = data.entra_directory_role.security_admin.template_id
-  principal_id       = data.azuread_user.john.id
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
+  principal_id       = data.msgraph-entra_user.john.id
   directory_scope_id = "/"
   justification      = "Security team member - requires elevated access for incident response"
 
   schedule_info {
-    start_date_time = "2025-01-08T00:00:00Z"
-
     expiration {
       type          = "afterDateTime"
       end_date_time = "2025-12-31T23:59:59Z"
+    }
+  }
+}
+
+# Example with duration-based expiration (8 hours) using UPN lookup
+# IMPORTANT: Using afterDuration protects against configuration drift from manual changes.
+# If someone modifies the assignment in the Azure Portal/Entra admin center,
+# Terraform will preserve your configured type and duration values and won't
+# try to revert the change. This is different from afterDateTime, which will
+# cause Terraform to detect drift and revert manual portal changes on next apply.
+resource "msgraph-entra_directory_role_eligible_assignment" "jane_temp_admin" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
+  principal_id       = data.msgraph-entra_user.jane.id
+  directory_scope_id = "/"
+  justification      = "Temporary access for system maintenance"
+
+  schedule_info {
+    expiration {
+      type     = "afterDuration"
+      duration = "PT8H" # 8 hours in ISO 8601 duration format
     }
   }
 }
@@ -110,35 +128,35 @@ resource "msgraph-entra_directory_role_eligible_assignment" "john_security_admin
 
 **Arguments:**
 
-- `role_definition_id` (Required) - The template ID of the directory role (get from `entra_directory_role` data source)
+- `role_definition_id` (Required) - The template ID of the directory role (get from `msgraph-entra_directory_role` data source)
 - `principal_id` (Required) - The object ID of the principal (user, group, or service principal)
 - `directory_scope_id` (Optional) - The scope of the assignment (default: "/" for tenant-wide)
 - `justification` (Optional) - Justification for the assignment
 - `schedule_info` (Optional) - Schedule configuration block:
-  - `start_date_time` (Optional) - When the eligibility starts (RFC3339 format, defaults to now)
   - `expiration` (Optional) - Expiration configuration:
     - `type` (Optional) - "noExpiration", "afterDateTime", or "afterDuration"
     - `end_date_time` (Optional) - End date/time when type is "afterDateTime" (RFC3339 format)
     - `duration` (Optional) - Duration when type is "afterDuration" (ISO 8601 format, e.g., "PT8H", "P365D")
 
-**Attributes:**
+**Read-Only Attributes:**
 
-- `id` - The ID of the role eligibility schedule request
+- `id` - The ID of the role eligibility schedule
 - `schedule_id` - The ID of the created role eligibility schedule
+- `schedule_info.start_date_time` - The actual time the eligibility started (set by Microsoft Graph)
 
 ### Data Sources
 
-#### `entra_directory_role`
+#### `msgraph-entra_directory_role`
 
 Retrieves information about an Entra ID directory role.
 
 ```hcl
-data "msgraph-entra_directory_role" "global_admin" {
-  display_name = "Global Administrator"
+data "msgraph-entra_directory_role" "security_admin" {
+  display_name = "Security Administrator"
 }
 
-output "global_admin_template_id" {
-  value = data.entra_directory_role.global_admin.template_id
+output "security_admin_template_id" {
+  value = data.msgraph-entra_directory_role.security_admin.template_id
 }
 ```
 
@@ -151,6 +169,77 @@ output "global_admin_template_id" {
 - `id` - The object ID of the directory role instance
 - `template_id` - The template ID (used for role assignments)
 - `description` - The role description
+
+#### `msgraph-entra_user`
+
+Retrieves information about an Entra ID user by their User Principal Name (UPN).
+
+```hcl
+data "msgraph-entra_user" "john" {
+  user_principal_name = "john.doe@contoso.com"
+}
+
+output "john_object_id" {
+  value = data.msgraph-entra_user.john.id
+}
+
+# Use in role assignment
+resource "msgraph-entra_directory_role_eligible_assignment" "john_security_admin" {
+  role_definition_id = data.msgraph-entra_directory_role.security_admin.template_id
+  principal_id       = data.msgraph-entra_user.john.id
+  directory_scope_id = "/"
+  justification      = "Security team member"
+
+  schedule_info {
+    expiration {
+      type          = "afterDateTime"
+      end_date_time = "2025-12-31T23:59:59Z"
+    }
+  }
+}
+```
+
+**Arguments:**
+
+- `user_principal_name` (Required) - The UPN of the user (typically their email)
+
+**Attributes:**
+
+- `id` - The object ID of the user
+- `display_name` - The display name
+- `mail` - Primary email address
+- `given_name` - First name
+- `surname` - Last name
+- `job_title` - Job title
+- `department` - Department
+- `account_enabled` - Whether the account is enabled
+
+## Expiration Strategies
+
+### Choosing Between afterDateTime and afterDuration
+
+Understanding the drift detection behavior is crucial for choosing the right expiration type:
+
+| Aspect | `afterDateTime` | `afterDuration` |
+|--------|----------------|-----------------|
+| **Configuration** | Explicit end date in RFC3339 | Duration in ISO 8601 (e.g., PT8H) |
+| **Graph Storage** | Stored as `afterDateTime` + end date | Converted to `afterDateTime` + computed end |
+| **Terraform State** | Stores exact `end_date_time` | Stores `type` + `duration` (not end date) |
+| **Portal Changes** | **Detected as drift** - reverted on apply | **NOT detected** - manual changes preserved |
+| **Use When** | You need strict enforcement of dates | You want flexibility for manual adjustments |
+| **Best For** | Compliance, audits, contractors | Break-glass, temporary access, emergencies |
+
+#### Example Scenario
+
+**With afterDateTime:**
+- Admin changes end date to 2026-06-30 in Azure Portal
+- Next `terraform plan` shows drift: wants to change back to 2025-12-31
+- `terraform apply` reverts the manual change ✅ Strict enforcement
+
+**With afterDuration:**
+- Admin changes end date in Azure Portal (Graph shows new afterDateTime)
+- Next `terraform plan` shows NO drift (compares `duration` not `end_date_time`)
+- `terraform apply` does nothing ✅ Manual change preserved
 
 ## Scalable Patterns
 
@@ -165,12 +254,12 @@ locals {
     {
       upn           = "john.doe@contoso.com"
       justification = "Security team lead"
-      duration      = "P365D"
+      end_date      = "2025-12-31T23:59:59Z"
     },
     {
       upn           = "jane.smith@contoso.com"
       justification = "Security analyst"
-      duration      = "P180D"
+      end_date      = "2025-06-30T23:59:59Z"
     },
   ]
 }
@@ -179,7 +268,8 @@ data "msgraph-entra_directory_role" "security_administrator" {
   display_name = "Security Administrator"
 }
 
-data "azuread_user" "security_admins" {
+# Look up users by UPN
+data "msgraph-entra_user" "security_admins" {
   for_each            = { for admin in local.security_admins : admin.upn => admin }
   user_principal_name = each.value.upn
 }
@@ -187,16 +277,15 @@ data "azuread_user" "security_admins" {
 resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
   for_each = { for admin in local.security_admins : admin.upn => admin }
 
-  role_definition_id = data.entra_directory_role.security_administrator.template_id
-  principal_id       = data.azuread_user.security_admins[each.key].id
+  role_definition_id = data.msgraph-entra_directory_role.security_administrator.template_id
+  principal_id       = data.msgraph-entra_user.security_admins[each.key].id
   directory_scope_id = "/"
   justification      = each.value.justification
 
   schedule_info {
-    start_date_time = "2025-01-08T00:00:00Z"
     expiration {
-      type     = "afterDuration"
-      duration = each.value.duration
+      type          = "afterDateTime"
+      end_date_time = each.value.end_date
     }
   }
 }
@@ -204,56 +293,82 @@ resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
 
 ### Pattern 2: Centralized Configuration
 
-Manage all roles in a single configuration file:
+Manage multiple roles with different expiration strategies in a single configuration file:
 
 ```hcl
 locals {
-  role_assignments = {
-    "Global Administrator" = [
-      { upn = "breakglass1@contoso.com", justification = "Break-glass", duration = "P365D" },
-    ]
-    "Security Administrator" = [
-      { upn = "security.lead@contoso.com", justification = "SOC lead", duration = "P365D" },
-      { upn = "security.analyst@contoso.com", justification = "SOC analyst", duration = "P180D" },
-    ]
-  }
+  # Security Administrators with fixed expiration dates (strict enforcement)
+  security_admins = [
+    {
+      upn           = "security.lead@contoso.com"
+      justification = "Security team lead - annual review cycle"
+      end_date      = "2025-12-31T23:59:59Z"
+    },
+    {
+      upn           = "soc.analyst@contoso.com"
+      justification = "SOC analyst - 6-month rotation"
+      end_date      = "2025-06-30T23:59:59Z"
+    },
+  ]
 
-  all_assignments = flatten([
-    for role_name, assignments in local.role_assignments : [
-      for assignment in assignments : {
-        key           = "${role_name}|${assignment.upn}"
-        role_name     = role_name
-        upn           = assignment.upn
-        justification = assignment.justification
-        duration      = assignment.duration
-      }
-    ]
-  ])
+  # User Administrators with permanent access
+  user_admins = [
+    {
+      upn           = "helpdesk.lead@contoso.com"
+      justification = "Help desk team lead - permanent access required"
+    },
+  ]
 }
 
-data "msgraph-entra_directory_role" "roles" {
-  for_each     = toset(keys(local.role_assignments))
-  display_name = each.key
+# Look up directory roles
+data "msgraph-entra_directory_role" "security_administrator" {
+  display_name = "Security Administrator"
 }
 
-data "azuread_user" "users" {
-  for_each            = toset([for assignment in local.all_assignments : assignment.upn])
-  user_principal_name = each.key
+data "msgraph-entra_directory_role" "user_administrator" {
+  display_name = "User Administrator"
 }
 
-resource "msgraph-entra_directory_role_eligible_assignment" "assignments" {
-  for_each = { for assignment in local.all_assignments : assignment.key => assignment }
+# Look up users by UPN
+data "msgraph-entra_user" "security_admins" {
+  for_each            = { for admin in local.security_admins : admin.upn => admin }
+  user_principal_name = each.value.upn
+}
 
-  role_definition_id = data.entra_directory_role.roles[each.value.role_name].template_id
-  principal_id       = data.azuread_user.users[each.value.upn].id
+data "msgraph-entra_user" "user_admins" {
+  for_each            = { for admin in local.user_admins : admin.upn => admin }
+  user_principal_name = each.value.upn
+}
+
+# Security Administrator assignments (afterDateTime)
+resource "msgraph-entra_directory_role_eligible_assignment" "security_admins" {
+  for_each = { for admin in local.security_admins : admin.upn => admin }
+
+  role_definition_id = data.msgraph-entra_directory_role.security_administrator.template_id
+  principal_id       = data.msgraph-entra_user.security_admins[each.key].id
   directory_scope_id = "/"
   justification      = each.value.justification
 
   schedule_info {
-    start_date_time = "2025-01-08T00:00:00Z"
     expiration {
-      type     = "afterDuration"
-      duration = each.value.duration
+      type          = "afterDateTime"
+      end_date_time = each.value.end_date
+    }
+  }
+}
+
+# User Administrator assignments (noExpiration)
+resource "msgraph-entra_directory_role_eligible_assignment" "user_admins" {
+  for_each = { for admin in local.user_admins : admin.upn => admin }
+
+  role_definition_id = data.msgraph-entra_directory_role.user_administrator.template_id
+  principal_id       = data.msgraph-entra_user.user_admins[each.key].id
+  directory_scope_id = "/"
+  justification      = each.value.justification
+
+  schedule_info {
+    expiration {
+      type = "noExpiration"
     }
   }
 }
@@ -261,12 +376,10 @@ resource "msgraph-entra_directory_role_eligible_assignment" "assignments" {
 
 ## Common Directory Roles
 
-Here are some commonly used Entra ID directory roles:
+Here are some commonly used Entra ID directory roles suitable for Terraform management:
 
-- **Global Administrator** - Highest privilege level, use sparingly
 - **Security Administrator** - Security operations and monitoring
 - **User Administrator** - User and group management
-- **Privileged Role Administrator** - Manage role assignments
 - **Application Administrator** - Manage enterprise applications
 - **Cloud Application Administrator** - Manage cloud applications
 - **Authentication Administrator** - Manage authentication methods
@@ -275,29 +388,16 @@ Here are some commonly used Entra ID directory roles:
 ## Best Practices
 
 1. **Use Eligible Assignments**: Always prefer eligible over active assignments for privileged roles
-2. **Time-Bound Access**: Use expiration dates or durations, avoid "noExpiration"
+2. **Understand Drift Behavior**:
+   - `afterDateTime`: Terraform detects and reverts manual portal changes (strict enforcement)
+   - `afterDuration`: Terraform preserves manual portal changes (flexible management)
 3. **Justifications**: Always provide clear justifications for audit purposes
-4. **Break-Glass Accounts**: Use eligible assignments even for emergency access accounts
+4. **Read-Only Fields**: Remember that `schedule_info.start_date_time` is set by Microsoft Graph for assignments being created at apply time.  Future start dates are not supported for this provider given that the schedule object doesn't get created until the schedule request is completed.
 5. **Regular Reviews**: Periodically review and rotate role assignments
 6. **Least Privilege**: Only assign the minimum required roles
 7. **Separate Roles**: Use one file per role for better organization and git history
 8. **Version Control**: Track all changes in git for audit trails
-
-## Architecture with Access Packages
-
-This provider works excellently with the pattern of **role-assignable groups + access packages**:
-
-1. Create a role-assignable PIM-enabled group (using `hashicorp/azuread` provider)
-2. Assign the Entra role to the group using this provider (eligible assignment)
-3. Create access packages (using `hashicorp/azuread` provider) that grant group membership
-4. Users request access through access packages, get group membership, then activate the role
-
-This architecture provides:
-- Self-service access requests
-- Approval workflows
-- Automated expiration
-- Just-in-time elevation
-- Full audit trails
+9.  **User Lookups**: Use the `msgraph-entra_user` data source to look up users by their UPN (email address) - no need to manually obtain object IDs
 
 ## Troubleshooting
 
@@ -348,9 +448,8 @@ See the [examples/](./examples/) directory for complete examples:
 
 - [examples/provider/](./examples/provider/) - Provider configuration examples
 - [examples/security-administrator/](./examples/security-administrator/) - Security Administrator role example
-- [examples/global-administrator/](./examples/global-administrator/) - Global Administrator role example
 - [examples/user-administrator/](./examples/user-administrator/) - User Administrator role example
-- [examples/complete-setup/](./examples/complete-setup/) - Complete multi-role setup
+- [examples/multiple-roles-schedules/](./examples/multiple-roles-schedules/) - Complete multi-role setup with different expiration strategies
 
 ## Contributing
 
